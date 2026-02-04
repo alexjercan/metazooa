@@ -1,8 +1,8 @@
 import argparse
 import json
 import re
-from collections import defaultdict
-from typing import List, Tuple, Dict, Set, Optional
+from collections import defaultdict, deque
+from typing import List, Tuple, Dict, Set, Optional, Any
 
 import requests
 from bs4 import BeautifulSoup
@@ -50,7 +50,56 @@ def species_main() -> None:
         json.dump(name_map, f)
 
 
-def build_nested(graph, node, common_names):
+def find_roots(graph: Dict[str, List[str]]) -> List[str]:
+    all_nodes = set(graph.keys())
+    children = {c for kids in graph.values() for c in kids}
+    return list(all_nodes - children)
+
+
+def parse_taxonomy_tree(lines: List[str]) -> Dict[str, List[str]]:
+    """
+    Parse an ASCII taxonomy tree into an adjacency list graph.
+    Returns dict: {parent: [children]}
+    """
+    graph = defaultdict(list)
+    stack: List[Tuple[int, str]] = []  # keeps (depth, node_name)
+    for raw_line in lines:
+        if not raw_line.strip():
+            continue
+
+        prefix_match = re.match(r"^([| +\\-]*)", raw_line)
+        assert prefix_match is not None
+
+        prefix = prefix_match.group(1)
+        depth = prefix.count("|") + prefix.count(" ") // 2
+        name = re.sub(r"^[| +\\-]*", "", raw_line).strip()
+        while stack and stack[-1][0] >= depth:
+            stack.pop()
+
+        if stack:
+            parent = stack[-1][1]
+            if name == parent:
+                name = f"{name}_child"
+            graph[parent].append(name)
+
+        if not name:
+            continue
+
+        if name not in graph:
+            graph[name] = []
+
+        stack.append((depth, name))
+
+    metazoa_children = []
+    for root in find_roots(graph):
+        if root != "Metazoa":
+            metazoa_children.append(root)
+
+    graph["Metazoa"] = metazoa_children
+    return dict(graph)
+
+
+def build_nested(graph: Dict[str, List[str]], node: str, common_names: Dict[str, str]) -> Dict[str, Any] | str:
     children = graph[node]
 
     if not children:
@@ -62,19 +111,20 @@ def build_nested(graph, node, common_names):
     }
 
 
-def graph_to_nested(graph, common_names):
+def graph_to_nested(graph: Dict[str, List[str]], common_names: Dict[str, str]) -> Dict[str, Any]:
     roots = find_roots(graph)
+
     return {
         root: build_nested(graph, root, common_names)
         for root in roots
     }
 
 
-def is_leaf(graph, node):
+def is_leaf(graph: Dict[str, List[str]], node: str) -> bool:
     return len(graph[node]) == 0
 
 
-def graph_to_graphviz(graph, common_names=None):
+def graph_to_graphviz(graph: Dict[str, List[str]], common_names: Optional[Dict[str, str]] = None) -> Digraph:
     dot = Digraph()
     dot.attr(rankdir="TB")
     dot.attr(splines="ortho")
@@ -107,151 +157,131 @@ def taxonomy_main():
         common_names = json.load(f)
 
     graph = parse_taxonomy_tree(lines)
-    nested = graph_to_nested(graph, common_names)
 
+    nested = graph_to_nested(graph, common_names)
     with open("taxonomy-graph.json", "w") as f:
         json.dump(nested, f)
 
-    exit(0)
     dot = graph_to_graphviz(graph, common_names)
     dot.render("taxonomy_tree", format="svg")
 
 
-def find_roots(graph):
-    all_nodes = set(graph.keys())
-    children = {c for kids in graph.values() for c in kids}
-    return list(all_nodes - children)
-
-
-def parse_taxonomy_tree(lines):
-    """
-    Parse an ASCII taxonomy tree into an adjacency list graph.
-    Returns dict: {parent: [children]}
-    """
-    graph = defaultdict(list)
-    stack = []  # keeps (depth, node_name)
-
-    for raw_line in lines:
-        if not raw_line.strip():
-            continue
-
-        # Count indentation depth based on leading tree characters
-        prefix_match = re.match(r"^([| +\\-]*)", raw_line)
-        prefix = prefix_match.group(1)
-
-        # Each 2 characters roughly represent one depth level
-        depth = prefix.count("|") + prefix.count(" ") // 2
-
-        # Extract node name (remove tree drawing chars)
-        name = re.sub(r"^[| +\\-]*", "", raw_line).strip()
-
-        # Adjust stack to current depth
-        while stack and stack[-1][0] >= depth:
-            stack.pop()
-
-        # Add edge from parent -> child
-        if stack:
-            parent = stack[-1][1]
-
-            # Make child unique if needed
-            if name == parent:
-                name = f"{name}_child"
-
-            graph[parent].append(name)
-
-        if not name:
-            continue
-
-        if name not in graph:
-            graph[name] = []
-
-        stack.append((depth, name))
-
-    metazoa_children = []
-    for root in find_roots(graph):
-        if root != "Metazoa":
-            metazoa_children.append(root)
-
-    graph["Metazoa"] = metazoa_children
-
-    return dict(graph)
-
-
-def get_all_species_in_clade(node: str, graph: Dict[str, List[str]],
-                             excluded: Set[str]) -> Set[str]:
-    """
-    Get all leaf nodes (species) in the subtree rooted at `node`,
-    excluding any nodes in the `excluded` set.
-    """
-    # If this node is excluded, return empty set
-    if node in excluded:
-        return set()
-
-    # If this node has no children, it's a leaf (species)
-    if not graph[node]:
-        return {node}
-
-    # Recursively get all species from children
-    species = set()
-    for child in graph[node]:
-        species.update(get_all_species_in_clade(child, graph, excluded))
-
-    return species
-
-
-def get_best_guess(clade: str, graph: Dict[str, List[str]], except_species: List[str]) -> Optional[str]:
-    """
-    Find the best guess within the given clade.
-
-    Strategy: Find the child subtree with the most species (excluding
-    those already guessed). This maximizes information gain.
-    """
-    excluded = set(except_species)
-
-    # Get all possible species in the current clade
-    all_in_clade = get_all_species_in_clade(clade, graph, excluded)
-
-    # If no species left, we're stuck (shouldn't happen in normal play)
-    if not all_in_clade:
-        return None
-
-    # If only one species left, that must be it
-    if len(all_in_clade) == 1:
-        return list(all_in_clade)[0]
-
-    # Find the child with the largest valid subtree
-    best_child = None
-    best_count = 0
-
-    for child in graph[clade]:
-        child_species = get_all_species_in_clade(child, graph, excluded)
-        count = len(child_species)
-
-        # We want a child that has at least one valid species
-        if count > best_count:
-            best_count = count
-            best_child = child
-
-    # If we found a good child subtree, recurse into it
-    if best_child is not None:
-        return get_best_guess(best_child, graph, except_species)
-
-    # Fallback: just pick any child that hasn't been excluded
-    for child in graph[clade]:
-        if child not in excluded:
-            return child
+def find_parent(graph: Dict[str, List[str]], child: str) -> Optional[str]:
+    for parent, children in graph.items():
+        if child in children:
+            return parent
 
     return None
 
 
-def guess_main(clade: str, except_species: List[str]) -> None:
-    """
-    Main function to determine the best guess.
+def remove_node(graph: Dict[str, List[str]], node: str) -> None:
+    children = graph.pop(node, [])
 
-    Args:
-        clade: The current clade we're narrowed down to (e.g., "Metazoa", "Aves")
-        except_species: List of species we've already guessed (and were wrong)
-    """
+    for child in children:
+        remove_node(graph, child)
+
+
+def is_ancestor_of(graph: Dict[str, List[str]], ancestor: str, descendant: str) -> bool:
+    parent = find_parent(graph, descendant)
+    while parent is not None:
+        if parent == ancestor:
+            return True
+        parent = find_parent(graph, parent)
+
+    return False
+
+
+def prune_graph(graph: Dict[str, List[str]], clade: str, species: str) -> Dict[str, List[str]]:
+    # Remove all other branches except the clade
+    new_graph = {}
+    for k, v in graph.items():
+        if is_ancestor_of(graph, clade, k) or k == clade:
+            new_graph[k] = v
+
+    graph = new_graph
+
+    # Remove the species from the clade, by pruning up the tree
+    # We remove the child clade that is a direct descendant of the clade that leads to the species
+    node = species
+    parent = find_parent(graph, node)
+    if parent is None:
+        return graph
+
+    while parent != clade:
+        node = parent
+        parent = find_parent(graph, node)
+        if parent is None:
+            return graph
+
+    remove_node(graph, node)
+    children = graph.get(clade, [])
+    if node in children:
+        children.remove(node)
+        graph[clade] = children
+
+    return graph
+
+
+def find_root(tree: Dict[str, List[str]]) -> str:
+    all_nodes = set(tree.keys())
+    children = set(c for v in tree.values() for c in v)
+    roots = all_nodes - children
+    if len(roots) != 1:
+        raise ValueError("Tree must have exactly one root")
+
+    return next(iter(roots))
+
+
+def build_parent_map(tree: Dict[str, List[str]]) -> Dict[str, str]:
+    parent = {}
+    for p, children in tree.items():
+        for c in children:
+            parent[c] = p
+    return parent
+
+
+def lca(tree: Dict[str, List[str]], a: str, b: str) -> str:
+    parent = build_parent_map(tree)
+
+    ancestors = set()
+    x = a
+    while x in parent:
+        ancestors.add(x)
+        x = parent[x]
+    ancestors.add(x)  # root
+
+    y = b
+    while y not in ancestors:
+        y = parent[y]
+
+    return y
+
+
+def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
+    candidates = [node for node in tree.keys() if is_leaf(tree, node)]
+
+    best_guess = None
+    best_worst_case = float("inf")
+
+    for guess in candidates:
+        buckets: Dict[str, int] = defaultdict(int)
+
+        for leaf in candidates:
+            clade = lca(tree, guess, leaf)
+            buckets[clade] += 1
+
+            if buckets[clade] >= best_worst_case:
+                break
+
+        worst_case = max(buckets.values())
+        if worst_case < best_worst_case:
+            best_worst_case = worst_case
+            best_guess = guess
+
+    return best_guess
+
+
+def guess_main(clade: str, except_species: List[str]) -> None:
     with open("name_map.json", "r") as f:
         name_map = json.load(f)
 
@@ -263,7 +293,11 @@ def guess_main(clade: str, except_species: List[str]) -> None:
 
     graph = parse_taxonomy_tree(lines)
 
-    guess = get_best_guess(clade, graph, except_species)
+    tree = dict(graph)
+    for s in except_species:
+        tree = prune_graph(tree, clade, s)
+
+    guess = best_leaf_guess(tree)
 
     if guess is None:
         print(f"No valid candidates found in clade {clade}")
