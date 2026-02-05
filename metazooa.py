@@ -1,53 +1,8 @@
 import argparse
 import json
 import re
-from collections import defaultdict, deque
-from typing import List, Tuple, Dict, Set, Optional, Any
-
-import requests
-from bs4 import BeautifulSoup
-from graphviz import Digraph
-from rich.progress import track
-
-
-def get_species() -> Tuple[List[str], List[str]]:
-    url = "https://metazooa.com/play/practice"
-    response = requests.get(url)
-    response.raise_for_status()
-
-    html = response.text
-    soup = BeautifulSoup(html, "html.parser")
-
-    script = soup.find("script", type="application/json")
-    if script and script.string:
-        data = json.loads(script.string)
-        species_list = data["v"][0][0]["speciesList"]
-        scientific_names = []
-        names = []
-        for species in species_list:
-            scientific_names.append(species["scientific"])
-            names.append(species["name"])
-
-        return scientific_names, names
-
-    return [], []
-
-
-def species_main() -> None:
-    name_map = {}
-
-    for _ in track(range(100), description="Getting species..."):
-        species, names = get_species()
-        for s, name in zip(species, names):
-            name_map[s] = name
-
-    with open("metazooa-species-sorted.txt", "w") as f:
-        names = sorted(name_map.keys())
-        for s in names:
-            f.write(s + "\n")
-
-    with open("name_map.json", "w") as f:
-        json.dump(name_map, f)
+from collections import defaultdict
+from typing import Dict, List, Optional, Tuple
 
 
 def find_roots(graph: Dict[str, List[str]]) -> List[str]:
@@ -62,7 +17,7 @@ def parse_taxonomy_tree(lines: List[str]) -> Dict[str, List[str]]:
     Returns dict: {parent: [children]}
     """
     graph = defaultdict(list)
-    stack: List[Tuple[int, str]] = []  # keeps (depth, node_name)
+    stack: List[Tuple[int, str]] = []
     for raw_line in lines:
         if not raw_line.strip():
             continue
@@ -99,74 +54,14 @@ def parse_taxonomy_tree(lines: List[str]) -> Dict[str, List[str]]:
     return dict(graph)
 
 
-def build_nested(graph: Dict[str, List[str]], node: str, common_names: Dict[str, str]) -> Dict[str, Any] | str:
-    children = graph[node]
-
-    if not children:
-        return common_names.get(node, node)
-
-    return {
-        child: build_nested(graph, child, common_names)
-        for child in children
-    }
-
-
-def graph_to_nested(graph: Dict[str, List[str]], common_names: Dict[str, str]) -> Dict[str, Any]:
-    roots = find_roots(graph)
-
-    return {
-        root: build_nested(graph, root, common_names)
-        for root in roots
-    }
-
-
 def is_leaf(graph: Dict[str, List[str]], node: str) -> bool:
+    """ Check if a node is a leaf in the graph """
     return len(graph[node]) == 0
 
 
-def graph_to_graphviz(graph: Dict[str, List[str]], common_names: Optional[Dict[str, str]] = None) -> Digraph:
-    dot = Digraph()
-    dot.attr(rankdir="TB")
-    dot.attr(splines="ortho")
-    dot.attr(nodesep="0.4")
-    dot.attr(ranksep="0.6")
-
-    for parent, children in graph.items():
-
-        parent_label = parent
-        if common_names and parent in common_names:
-            parent_label = f"{parent}\n({common_names[parent]})"
-
-        # Style leaf vs internal nodes
-        if is_leaf(graph, parent):
-            dot.node(parent, label=parent_label, shape="box")
-        else:
-            dot.node(parent, label=parent_label, shape="ellipse")
-
-        for child in children:
-            dot.edge(parent, child)
-
-    return dot
-
-
-def taxonomy_main():
-    with open("commontree.txt", "r") as f:
-        lines = f.readlines()
-
-    with open("name_map.json", "r") as f:
-        common_names = json.load(f)
-
-    graph = parse_taxonomy_tree(lines)
-
-    nested = graph_to_nested(graph, common_names)
-    with open("taxonomy-graph.json", "w") as f:
-        json.dump(nested, f)
-
-    dot = graph_to_graphviz(graph, common_names)
-    dot.render("taxonomy_tree", format="svg")
-
-
 def find_parent(graph: Dict[str, List[str]], child: str) -> Optional[str]:
+    """ Find the parent of a given child node """
+
     for parent, children in graph.items():
         if child in children:
             return parent
@@ -175,6 +70,8 @@ def find_parent(graph: Dict[str, List[str]], child: str) -> Optional[str]:
 
 
 def remove_node(graph: Dict[str, List[str]], node: str) -> None:
+    """ Recursively remove a node and its descendants from the graph """
+
     children = graph.pop(node, [])
 
     for child in children:
@@ -182,6 +79,8 @@ def remove_node(graph: Dict[str, List[str]], node: str) -> None:
 
 
 def is_ancestor_of(graph: Dict[str, List[str]], ancestor: str, descendant: str) -> bool:
+    """ Check if 'ancestor' is an ancestor of 'descendant' in the graph """
+
     parent = find_parent(graph, descendant)
     while parent is not None:
         if parent == ancestor:
@@ -192,6 +91,8 @@ def is_ancestor_of(graph: Dict[str, List[str]], ancestor: str, descendant: str) 
 
 
 def prune_graph(graph: Dict[str, List[str]], clade: str, species: str) -> Dict[str, List[str]]:
+    """ Prune the graph to only include the specified clade, and removing all the related species. """
+
     # Remove all other branches except the clade
     new_graph = {}
     for k, v in graph.items():
@@ -223,6 +124,8 @@ def prune_graph(graph: Dict[str, List[str]], clade: str, species: str) -> Dict[s
 
 
 def find_root(tree: Dict[str, List[str]]) -> str:
+    """ Find the root of the tree """
+
     all_nodes = set(tree.keys())
     children = set(c for v in tree.values() for c in v)
     roots = all_nodes - children
@@ -233,23 +136,31 @@ def find_root(tree: Dict[str, List[str]]) -> str:
 
 
 def build_parent_map(tree: Dict[str, List[str]]) -> Dict[str, str]:
+    """ Build a map of child -> parent for the tree """
+
     parent = {}
     for p, children in tree.items():
         for c in children:
             parent[c] = p
+
     return parent
 
 
 def lca(tree: Dict[str, List[str]], a: str, b: str) -> str:
+    """ Find the lowest common ancestor of nodes a and b in the tree """
+
     parent = build_parent_map(tree)
 
+    # Find all ancestors of a
     ancestors = set()
     x = a
     while x in parent:
         ancestors.add(x)
         x = parent[x]
+
     ancestors.add(x)  # root
 
+    # Iterate up from b until we find a common ancestor
     y = b
     while y not in ancestors:
         y = parent[y]
@@ -258,14 +169,42 @@ def lca(tree: Dict[str, List[str]], a: str, b: str) -> str:
 
 
 def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
+    """
+    Find the best leaf guess that minimizes the worst-case number of remaining candidates
+
+    # Example:
+
+    Mammals
+    ├── Dogs: Husky, Corgi, Bulldog
+    ├── Cats: Lion, Tiger, House Cat
+    └── Primates: Chimp, Gorilla
+
+    If I guess "Husky" (Same for Corgi, Bulldog, and basically same for the cats)
+    - Husky vs other Dogs (Corgi, Bulldog) -> LCA is "Dogs" (2 candidates)
+    - Husky vs Cats (Lion, Tiger, House Cat) -> LCA is "Mammals" (3 candidates)
+    - Husky vs Primates (Chimp, Gorilla) -> LCA is "Mammals" (2 candidates)
+    - Worst case: 5 animals (the 3 cats + 2 primates in the "Mammals" bucket)
+
+    If I guess "Chimp" (or Gorilla) (a primate):
+    - Chimp vs other Primates (Gorilla) -> LCA is "Primates" (1 candidate)
+    - Chimp vs Dogs (Husky, Corgi, Bulldog) -> LCA is "Mammals" (3 candidates)
+    - Chimp vs Cats (Lion, Tiger, House Cat) -> LCA is "Mammals" (3 candidates)
+    - Worst case: 6 animals (the 3 dogs + 3 cats in the "Mammals" bucket)
+    """
+
+    # Find all the possible candidates (leaf nodes) in the tree
     candidates = [node for node in tree.keys() if is_leaf(tree, node)]
 
     best_guess = None
     best_worst_case = float("inf")
 
+    # Simulate the guess for each candidate and calculate
+    # the worst-case number of remaining candidates
     for guess in candidates:
         buckets: Dict[str, int] = defaultdict(int)
 
+        # Count how many candidates would fall into each bucket
+        # based on their LCA with the guess
         for leaf in candidates:
             clade = lca(tree, guess, leaf)
             buckets[clade] += 1
@@ -273,6 +212,8 @@ def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
             if buckets[clade] >= best_worst_case:
                 break
 
+        # The worst-case number of remaining candidates is
+        # the size of the largest bucket
         worst_case = max(buckets.values())
         if worst_case < best_worst_case:
             best_worst_case = worst_case
@@ -281,7 +222,25 @@ def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
     return best_guess
 
 
-def guess_main(clade: str, except_species: List[str]) -> None:
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument(
+        "--guess-clade",
+        type=str,
+        help="Get best guess species for a given clade",
+    )
+    parser.add_argument(
+        "--without",
+        type=str,
+        help="Species to exclude from guessing, comma-separated",
+    )
+
+    args = parser.parse_args()
+
+    clade = args.guess_clade
+    except_species = args.without.split(",") if args.without else []
+
     with open("name_map.json", "r") as f:
         name_map = json.load(f)
 
@@ -301,44 +260,7 @@ def guess_main(clade: str, except_species: List[str]) -> None:
 
     if guess is None:
         print(f"No valid candidates found in clade {clade}")
-        return
+        exit(1)
 
     named_guess = name_map.get(guess, guess)
     print(f"Best guess for clade {clade}: {named_guess} ({guess})")
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-
-    parser.add_argument(
-        "--species",
-        action="store_true",
-        help="Get species from Metazooa",
-    )
-    parser.add_argument(
-        "--taxonomy",
-        action="store_true",
-        help="Parse taxonomy tree from commontree.txt",
-    )
-    parser.add_argument(
-        "--guess-clade",
-        type=str,
-        help="Get best guess species for a given clade",
-    )
-    parser.add_argument(
-        "--without",
-        type=str,
-        help="Species to exclude from guessing, comma-separated",
-    )
-
-    args = parser.parse_args()
-
-    if args.species:
-        species_main()
-
-    if args.taxonomy:
-        taxonomy_main()
-
-    if args.guess_clade:
-        except_species = args.without.split(",") if args.without else []
-        guess_main(args.guess_clade, except_species)

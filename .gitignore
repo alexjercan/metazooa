@@ -217,3 +217,5 @@ __marimo__/
 
 *.txt
 *.json
+taxonomy_tree
+taxonomy_tree.svg
