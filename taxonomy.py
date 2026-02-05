@@ -1,3 +1,4 @@
+import argparse
 import json
 import re
 from collections import defaultdict
@@ -106,17 +107,55 @@ def graph_to_graphviz(graph: Dict[str, List[str]], common_names: Optional[Dict[s
 
 
 if __name__ == "__main__":
-    with open("commontree.txt", "r") as f:
+    parser = argparse.ArgumentParser(description="Generate taxonomy visualizations from tree data")
+    parser.add_argument(
+        "--tree-file",
+        default="commontree.txt",
+        help="Input taxonomy tree file (default: commontree.txt)",
+    )
+    parser.add_argument(
+        "--names-file",
+        default="name_map.json",
+        help="Input common names mapping file (default: name_map.json)",
+    )
+    parser.add_argument(
+        "--output-json",
+        default="taxonomy-graph.json",
+        help="Output nested JSON file (default: taxonomy-graph.json)",
+    )
+    parser.add_argument(
+        "--output-svg",
+        default="taxonomy_tree",
+        help="Output SVG file name without extension (default: taxonomy_tree)",
+    )
+    parser.add_argument(
+        "--no-json",
+        action="store_true",
+        help="Skip generating JSON output",
+    )
+    parser.add_argument(
+        "--no-svg",
+        action="store_true",
+        help="Skip generating SVG output",
+    )
+
+    args = parser.parse_args()
+
+    with open(args.tree_file, "r") as f:
         lines = f.readlines()
 
-    with open("name_map.json", "r") as f:
+    with open(args.names_file, "r") as f:
         common_names = json.load(f)
 
     graph = parse_taxonomy_tree(lines)
 
-    nested = graph_to_nested(graph, common_names)
-    with open("taxonomy-graph.json", "w") as f:
-        json.dump(nested, f)
+    if not args.no_json:
+        nested = graph_to_nested(graph, common_names)
+        with open(args.output_json, "w") as f:
+            json.dump(nested, f)
+        print(f"Wrote taxonomy graph to {args.output_json}")
 
-    dot = graph_to_graphviz(graph, common_names)
-    dot.render("taxonomy_tree", format="svg")
+    if not args.no_svg:
+        dot = graph_to_graphviz(graph, common_names)
+        dot.render(args.output_svg, format="svg", cleanup=True)
+        print(f"Wrote taxonomy visualization to {args.output_svg}.svg")
