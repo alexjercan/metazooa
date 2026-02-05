@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - master
+    paths:
+      - index.html
+      - scripts/get_species.py
+      - scripts/generate_tree.py
   workflow_dispatch:
 
 permissions:
