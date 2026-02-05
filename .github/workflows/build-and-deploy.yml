@@ -28,9 +28,10 @@ jobs:
           pip install requests beautifulsoup4 rich ete4
 
       - name: Fetch taxonomy data
-        run: |
-          python scritps/get_species.py
-          python scritps/generate_tree.py
+        run: python scripts/fetch_species.py
+
+      - name: Generate phylogenetic tree
+        run: python scripts/generate_tree.py
 
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
