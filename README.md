@@ -46,3 +46,28 @@ that guess and repeat the process until you find the correct answer.
 uv run --active python metazooa.py --clade [CLADE] --without '[ANIMAL1], [ANIMAL2], ...'
 ```
 
+### Example
+
+The heuristic is to guess the animal that has the least number of candidates in
+the worst case scenario. For example, if we have the following tree:
+
+Mammals
+├── Dogs: Husky, Corgi, Bulldog
+├── Cats: Lion, Tiger, House Cat
+└── Primates: Chimp, Gorilla
+
+If I guess "Husky" (Same for Corgi, Bulldog, and basically same for the cats)
+- Husky vs other Dogs (Corgi, Bulldog) -> LCA is "Dogs" (2 candidates)
+- Husky vs Cats (Lion, Tiger, House Cat) -> LCA is "Mammals" (3 candidates)
+- Husky vs Primates (Chimp, Gorilla) -> LCA is "Mammals" (2 candidates)
+- Worst case: 5 animals (the 3 cats + 2 primates in the "Mammals" bucket)
+
+If I guess "Chimp" (or Gorilla) (a primate):
+- Chimp vs other Primates (Gorilla) -> LCA is "Primates" (1 candidate)
+- Chimp vs Dogs (Husky, Corgi, Bulldog) -> LCA is "Mammals" (3 candidates)
+- Chimp vs Cats (Lion, Tiger, House Cat) -> LCA is "Mammals" (3 candidates)
+- Worst case: 6 animals (the 3 dogs + 3 cats in the "Mammals" bucket)
+
+Then the best guess is to guess either one of the dogs or the cats, which will
+give us a worst case of 5 candidates, instead of guessing a primate which will
+give us a worst case of 6 candidates.
