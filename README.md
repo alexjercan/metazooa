@@ -48,14 +48,7 @@ uv run --active python metazooa.py --clade [CLADE] --without '[ANIMAL1],[ANIMAL2
 
 5. (Optional) Web Page
 
-You can also use the `web` folder to run everything as a web page. First you
-will need to manually copy the `commontree.txt` and `name_map.json` files to
-the `web` folder. Then you can run the web server using:
-
 ```console
-cp commontree.txt web/
-cp name_map.json web/
-cd web
 python3 -m http.server
 ```
 
