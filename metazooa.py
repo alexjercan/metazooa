@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Find the best species guess for a given clade using minimax strategy."""
 
-import os
 import argparse
 import json
+import os
 import random
 from collections import defaultdict
 from typing import Dict, List, Optional
