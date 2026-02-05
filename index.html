@@ -374,42 +374,28 @@
             return bestGuess;
         }
 
-        function parseTaxonomyTree(text) {
+        function jsonTreeToGraph(jsonTree, nameMap) {
             const graph = {};
-            const stack = [];
 
-            for (const rawLine of text.split('\n')) {
-                if (!rawLine.trim()) continue;
+            function traverse(node) {
+                const scientific = node.scientific;
+                graph[scientific] = [];
 
-                const prefixMatch = rawLine.match(/^([| +\\-]*)/);
-                const prefix = prefixMatch[1];
-                const depth = (prefix.match(/\|/g) || []).length + Math.floor((prefix.match(/ /g) || []).length / 2);
-                let name = rawLine.replace(/^[| +\\-]*/, '').trim();
-
-                while (stack.length > 0 && stack[stack.length - 1][0] >= depth) {
-                    stack.pop();
+                // Build name map from tree
+                if (node.scientific && node.name) {
+                    nameMap[node.scientific] = node.name;
                 }
 
-                if (stack.length > 0) {
-                    const parent = stack[stack.length - 1][1];
-                    if (name === parent) {
-                        name = `${name}_child`;
+                if (node.children) {
+                    for (const child of node.children) {
+                        const childScientific = child.scientific;
+                        graph[scientific].push(childScientific);
+                        traverse(child);
                     }
-                    if (!graph[parent]) graph[parent] = [];
-                    graph[parent].push(name);
-                }
-
-                if (name) {
-                    if (!graph[name]) graph[name] = [];
-                    stack.push([depth, name]);
                 }
             }
 
-            // Ensure Metazoa exists at root
-            const roots = findRoots(graph);
-            const metazoaChildren = roots.filter(r => r !== 'Metazoa');
-            graph['Metazoa'] = metazoaChildren;
-
+            traverse(jsonTree);
             return graph;
         }
 
@@ -427,12 +413,9 @@
         // Load data
         async function loadData() {
             try {
-                const treeRes = await fetch('commontree.txt');
-                const treeText = await treeRes.text();
-                graph = parseTaxonomyTree(treeText);
-
-                const mapRes = await fetch('name_map.json');
-                nameMap = await mapRes.json();
+                const treeRes = await fetch('commontree.json');
+                const treeJson = await treeRes.json();
+                graph = jsonTreeToGraph(treeJson, nameMap);
             } catch (err) {
                 showError(`Failed to load data: ${err.message}`);
             }

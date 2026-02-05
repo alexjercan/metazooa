@@ -9,6 +9,7 @@ authors = [
 requires-python = ">=3.13"
 dependencies = [
     "beautifulsoup4>=4.14.3",
+    "ete4>=4.4.0",
     "graphviz>=0.21",
     "requests>=2.32.5",
     "rich>=14.3.2",

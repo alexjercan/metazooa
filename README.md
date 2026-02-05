@@ -8,7 +8,7 @@ This is an attempt to create a solver for the metazooa game.
 Create a list of all the species in the game using
 
 ```console
-uv run --active python species.py
+uv run --active python scripts/get_species.py
 ```
 
 This will create a file `metazooa-species-sorted.txt` that contains a list of
@@ -23,12 +23,18 @@ phylogenetic tree.
 - Select "Choose" and you will get a tree.
 - Select "Save as" and save the tree in text tree format.
 
+Or you can do it automatically using the `generate_tree.py` script:
+
+```console
+uv run --active python scripts/generate_tree.py
+```
+
 3. Visualization
 
 You can generate an svg graph of the tree using the `taxonomy.py` script:
 
 ```console
-uv run --active python taxonomy.py
+uv run --active python scripts/view_taxonomy.py
 ```
 
 4. Solve the puzzle

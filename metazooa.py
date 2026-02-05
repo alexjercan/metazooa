@@ -1,57 +1,12 @@
+#!/usr/bin/env python3
+"""Find the best species guess for a given clade using minimax strategy."""
+
+import os
 import argparse
 import json
-import re
+import random
 from collections import defaultdict
-from typing import Dict, List, Optional, Tuple
-
-
-def find_roots(graph: Dict[str, List[str]]) -> List[str]:
-    all_nodes = set(graph.keys())
-    children = {c for kids in graph.values() for c in kids}
-    return list(all_nodes - children)
-
-
-def parse_taxonomy_tree(lines: List[str]) -> Dict[str, List[str]]:
-    """
-    Parse an ASCII taxonomy tree into an adjacency list graph.
-    Returns dict: {parent: [children]}
-    """
-    graph = defaultdict(list)
-    stack: List[Tuple[int, str]] = []
-    for raw_line in lines:
-        if not raw_line.strip():
-            continue
-
-        prefix_match = re.match(r"^([| +\\-]*)", raw_line)
-        assert prefix_match is not None
-
-        prefix = prefix_match.group(1)
-        depth = prefix.count("|") + prefix.count(" ") // 2
-        name = re.sub(r"^[| +\\-]*", "", raw_line).strip()
-        while stack and stack[-1][0] >= depth:
-            stack.pop()
-
-        if stack:
-            parent = stack[-1][1]
-            if name == parent:
-                name = f"{name}_child"
-            graph[parent].append(name)
-
-        if not name:
-            continue
-
-        if name not in graph:
-            graph[name] = []
-
-        stack.append((depth, name))
-
-    metazoa_children = []
-    for root in find_roots(graph):
-        if root != "Metazoa":
-            metazoa_children.append(root)
-
-    graph["Metazoa"] = metazoa_children
-    return dict(graph)
+from typing import Dict, List, Optional
 
 
 def is_leaf(graph: Dict[str, List[str]], node: str) -> bool:
@@ -115,6 +70,28 @@ def prune_graph(graph: Dict[str, List[str]], clade: str, species: List[str]) -> 
     return graph
 
 
+def json_tree_to_graph(json_node: Dict, graph: Dict[str, List[str]], name_map: Dict[str, str]) -> None:
+    """Convert JSON tree structure to adjacency list graph."""
+    scientific = json_node.get("scientific", "")
+
+    if scientific not in graph:
+        graph[scientific] = []
+
+    if "children" in json_node:
+        for child in json_node["children"]:
+            child_scientific = child.get("scientific", "")
+            graph[scientific].append(child_scientific)
+            json_tree_to_graph(child, graph, name_map)
+
+            # Update name map with both scientific and common names
+            if child_scientific and "name" in child:
+                name_map[child_scientific] = child["name"]
+
+    # Store the common name
+    if scientific and "name" in json_node:
+        name_map[scientific] = json_node["name"]
+
+
 def build_parent_map(tree: Dict[str, List[str]]) -> Dict[str, str]:
     """Build a map of child -> parent for the tree"""
     parent = {}
@@ -144,7 +121,7 @@ def lca(tree: Dict[str, List[str]], a: str, b: str) -> str:
     return y
 
 
-def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
+def best_leaf_guess(tree: Dict[str, List[str]]) -> List[str]:
     """
     Find the best leaf guess that minimizes the worst-case number of remaining candidates.
 
@@ -154,8 +131,8 @@ def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
     """
     candidates = [node for node in tree.keys() if is_leaf(tree, node)]
 
-    best_guess = None
     best_worst_case = float("inf")
+    best_guesses: List[str] = []
 
     for guess in candidates:
         buckets: Dict[str, int] = defaultdict(int)
@@ -171,9 +148,12 @@ def best_leaf_guess(tree: Dict[str, List[str]]) -> Optional[str]:
         worst_case = max(buckets.values())
         if worst_case < best_worst_case:
             best_worst_case = worst_case
-            best_guess = guess
+            best_guesses = []
 
-    return best_guess
+        if worst_case == best_worst_case:
+            best_guesses.append(guess)
+
+    return best_guesses
 
 
 if __name__ == "__main__":
@@ -192,34 +172,44 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--tree-file",
-        default="commontree.txt",
-        help="Taxonomy tree file (default: commontree.txt)",
-    )
-    parser.add_argument(
-        "--names-file",
-        default="name_map.json",
-        help="Species name mapping file (default: name_map.json)",
+        default="commontree.json",
+        help="Taxonomy tree file in JSON format (default: commontree.json)",
     )
 
     args = parser.parse_args()
 
-    with open(args.names_file, "r") as f:
-        name_map = json.load(f)
+    # Check if we have the required files
+    if os.path.isfile(args.tree_file) is False:
+        print(f"Error: {args.tree_file} not found, downloading...")
+        os.system("python3 scripts/get_species.py --requests 100 --mapping-file name_map.json")
+        os.system(f"python3 scripts/generate_tree.py --names-file name_map.json --output {args.tree_file}")
 
+    # Load JSON tree
+    try:
+        with open(args.tree_file, "r") as f:
+            json_tree = json.load(f)
+    except FileNotFoundError:
+        print(f"Error: {args.tree_file} not found")
+        exit(1)
+
+    # Convert JSON tree to graph and build name map
+    graph: Dict[str, List[str]] = {}
+    name_map: Dict[str, str] = {}
+    json_tree_to_graph(json_tree, graph, name_map)
+
+    # Convert common names to scientific names for exclusions
     scientific_map = {v: k for k, v in name_map.items()}
     except_species = [scientific_map.get(s, s) for s in args.without.split(",") if s.strip()]
 
-    with open(args.tree_file, "r") as f:
-        lines = f.readlines()
-
-    graph = parse_taxonomy_tree(lines)
+    # Prune and guess
     tree = prune_graph(dict(graph), args.clade, except_species)
+    guesses = best_leaf_guess(tree)
 
-    guess = best_leaf_guess(tree)
-
-    if guess is None:
+    if not guesses:
         print(f"No valid candidates found in clade {args.clade}")
         exit(1)
 
+    guess = random.choice(guesses)
     named_guess = name_map.get(guess, guess)
     print(f"Best guess for clade {args.clade}: {named_guess} ({guess})")
+    print(f"Other equally good guesses: {[name_map.get(g, g) for g in guesses if g != guess]}")
