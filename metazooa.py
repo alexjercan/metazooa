@@ -90,7 +90,7 @@ def is_ancestor_of(graph: Dict[str, List[str]], ancestor: str, descendant: str) 
     return False
 
 
-def prune_graph(graph: Dict[str, List[str]], clade: str, species: str) -> Dict[str, List[str]]:
+def prune_graph(graph: Dict[str, List[str]], clade: str, species: List[str]) -> Dict[str, List[str]]:
     """ Prune the graph to only include the specified clade, and removing all the related species. """
 
     # Remove all other branches except the clade
@@ -103,22 +103,22 @@ def prune_graph(graph: Dict[str, List[str]], clade: str, species: str) -> Dict[s
 
     # Remove the species from the clade, by pruning up the tree
     # We remove the child clade that is a direct descendant of the clade that leads to the species
-    node = species
-    parent = find_parent(graph, node)
-    if parent is None:
-        return graph
-
-    while parent != clade:
-        node = parent
+    for node in species:
         parent = find_parent(graph, node)
         if parent is None:
             return graph
 
-    remove_node(graph, node)
-    children = graph.get(clade, [])
-    if node in children:
-        children.remove(node)
-        graph[clade] = children
+        while parent != clade:
+            node = parent
+            parent = find_parent(graph, node)
+            if parent is None:
+                return graph
+
+        remove_node(graph, node)
+        children = graph.get(clade, [])
+        if node in children:
+            children.remove(node)
+            graph[clade] = children
 
     return graph
 
@@ -253,9 +253,7 @@ if __name__ == "__main__":
     graph = parse_taxonomy_tree(lines)
 
     tree = dict(graph)
-    for s in except_species:
-        tree = prune_graph(tree, clade, s)
-
+    tree = prune_graph(tree, clade, except_species)
     guess = best_leaf_guess(tree)
 
     if guess is None:
