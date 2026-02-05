@@ -31,7 +31,7 @@ You can generate an svg graph of the tree using the `taxonomy.py` script:
 uv run --active python taxonomy.py
 ```
 
-3. Solve the puzzle
+4. Solve the puzzle
 
 You can use the `metazooa.py` script to solve the puzzle:
 
@@ -43,8 +43,24 @@ This will give you the best possible guess for the puzzle. Then you can attempt
 that guess and repeat the process until you find the correct answer.
 
 ```console
-uv run --active python metazooa.py --clade [CLADE] --without '[ANIMAL1], [ANIMAL2], ...'
+uv run --active python metazooa.py --clade [CLADE] --without '[ANIMAL1],[ANIMAL2],...'
 ```
+
+5. (Optional) Web Page
+
+You can also use the `web` folder to run everything as a web page. First you
+will need to manually copy the `commontree.txt` and `name_map.json` files to
+the `web` folder. Then you can run the web server using:
+
+```console
+cp commontree.txt web/
+cp name_map.json web/
+cd web
+python3 -m http.server
+```
+
+Then you can open `http://localhost:8000` in your browser and use the web page
+to solve the puzzle.
 
 ### Example
 
@@ -71,3 +87,5 @@ If I guess "Chimp" (or Gorilla) (a primate):
 Then the best guess is to guess either one of the dogs or the cats, which will
 give us a worst case of 5 candidates, instead of guessing a primate which will
 give us a worst case of 6 candidates.
+
+

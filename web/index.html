@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metazooa Guesser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --cream: #faf7f0;
+            --dark: #1a1a1a;
+            --sage: #6b8e6f;
+            --accent: #d4a574;
+            --border: #e8ddd0;
+        }
+
+        body {
+            font-family: "Georgia", serif;
+            background: linear-gradient(135deg, var(--cream) 0%, #f5ede3 100%);
+            color: var(--dark);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 8px;
+            font-weight: 400;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 32px;
+            font-style: italic;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            color: var(--sage);
+        }
+
+        input, textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: "Georgia", serif;
+            font-size: 14px;
+            background: #fafaf8;
+            transition: all 0.2s;
+        }
+
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: var(--sage);
+            background: white;
+            box-shadow: 0 0 0 2px rgba(107, 142, 111, 0.08);
+        }
+
+        textarea {
+            resize: vertical;
+            min-height: 80px;
+            font-size: 13px;
+        }
+
+        .help-text {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+            font-style: italic;
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: var(--sage);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: "Georgia", serif;
+        }
+
+        button:hover:not(:disabled) {
+            background: #5a7b5e;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(107, 142, 111, 0.2);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .result {
+            margin-top: 32px;
+            padding: 24px;
+            background: #f9f7f3;
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .result-label {
+            font-size: 12px;
+            color: #999;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .result-species {
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--sage);
+            margin-bottom: 4px;
+        }
+
+        .result-scientific {
+            font-size: 13px;
+            color: #888;
+            font-style: italic;
+        }
+
+        .error {
+            color: #c94a4a;
+            font-size: 13px;
+            padding: 12px;
+            background: #fef3f3;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .loading {
+            text-align: center;
+            color: var(--sage);
+            font-style: italic;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Metazooa</h1>
+        <p class="subtitle">Find your perfect species</p>
+
+        <div class="error" id="error"></div>
+
+        <form id="guesser-form">
+            <div class="form-group">
+                <label for="clade">Clade</label>
+                <input
+                    type="text"
+                    id="clade"
+                    name="clade"
+                    required
+                    placeholder="e.g., Mammalia, Aves, Insecta"
+                >
+                <p class="help-text">Enter the clade to search within</p>
+            </div>
+
+            <div class="form-group">
+                <label for="exclusions">Exclude Species (Optional)</label>
+                <textarea
+                    id="exclusions"
+                    name="exclusions"
+                    placeholder="One species per line&#10;e.g., Dog&#10;Cat&#10;Dolphin"
+                ></textarea>
+                <p class="help-text">Enter species names (common names or scientific names)</p>
+            </div>
+
+            <button type="submit">Find Best Guess</button>
+        </form>
+
+        <div class="loading" id="loading">Processing...</div>
+
+        <div class="result" id="result">
+            <div class="result-label">Best Guess</div>
+            <div class="result-species" id="result-name"></div>
+            <div class="result-scientific" id="result-scientific"></div>
+        </div>
+    </div>
+
+    <script>
+        // Taxonomy algorithms
+        function findRoots(graph) {
+            const allNodes = new Set(Object.keys(graph));
+            const children = new Set();
+            for (const kids of Object.values(graph)) {
+                for (const child of kids) {
+                    children.add(child);
+                }
+            }
+            return Array.from(allNodes).filter(n => !children.has(n));
+        }
+
+        function findParent(graph, child) {
+            for (const [parent, children] of Object.entries(graph)) {
+                if (children.includes(child)) {
+                    return parent;
+                }
+            }
+            return null;
+        }
+
+        function isAncestorOf(graph, ancestor, descendant) {
+            let parent = findParent(graph, descendant);
+            while (parent !== null) {
+                if (parent === ancestor) return true;
+                parent = findParent(graph, parent);
+            }
+            return false;
+        }
+
+        function removeNode(graph, node) {
+            const children = graph[node] || [];
+            delete graph[node];
+            for (const child of children) {
+                removeNode(graph, child);
+            }
+        }
+
+        function pruneGraph(graph, clade, species) {
+            // Keep only the clade and its ancestors
+            const newGraph = {};
+            for (const [k, v] of Object.entries(graph)) {
+                if (isAncestorOf(graph, clade, k) || k === clade) {
+                    newGraph[k] = [...v];
+                }
+            }
+
+            let workingGraph = newGraph;
+
+            // Remove species
+            for (const node of species) {
+                let currentNode = node;
+                let parent = findParent(workingGraph, currentNode);
+
+                if (parent === null) continue;
+
+                while (parent !== clade) {
+                    currentNode = parent;
+                    parent = findParent(workingGraph, currentNode);
+                    if (parent === null) break;
+                }
+
+                if (parent === clade) {
+                    removeNode(workingGraph, currentNode);
+                    const children = workingGraph[clade] || [];
+                    workingGraph[clade] = children.filter(c => c !== currentNode);
+                }
+            }
+
+            return workingGraph;
+        }
+
+        function isLeaf(graph, node) {
+            return (graph[node] || []).length === 0;
+        }
+
+        function buildParentMap(tree) {
+            const parentMap = {};
+            for (const [p, children] of Object.entries(tree)) {
+                for (const c of children) {
+                    parentMap[c] = p;
+                }
+            }
+            return parentMap;
+        }
+
+        function lca(tree, a, b) {
+            const parentMap = buildParentMap(tree);
+            const ancestors = new Set();
+
+            let x = a;
+            while (x in parentMap) {
+                ancestors.add(x);
+                x = parentMap[x];
+            }
+            ancestors.add(x);
+
+            let y = b;
+            while (!ancestors.has(y)) {
+                y = parentMap[y];
+            }
+            return y;
+        }
+
+        function bestLeafGuess(tree) {
+            const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
+
+            if (candidates.length === 0) return null;
+
+            let bestGuess = null;
+            let bestWorstCase = Infinity;
+
+            for (const guess of candidates) {
+                const buckets = {};
+
+                for (const leaf of candidates) {
+                    const clade = lca(tree, guess, leaf);
+                    buckets[clade] = (buckets[clade] || 0) + 1;
+
+                    if (buckets[clade] >= bestWorstCase) break;
+                }
+
+                const worstCase = Math.max(...Object.values(buckets));
+                if (worstCase < bestWorstCase) {
+                    bestWorstCase = worstCase;
+                    bestGuess = guess;
+                }
+            }
+
+            return bestGuess;
+        }
+
+        function parseTaxonomyTree(text) {
+            const graph = {};
+            const stack = [];
+
+            for (const rawLine of text.split('\n')) {
+                if (!rawLine.trim()) continue;
+
+                const prefixMatch = rawLine.match(/^([| +\\-]*)/);
+                const prefix = prefixMatch[1];
+                const depth = (prefix.match(/\|/g) || []).length + Math.floor((prefix.match(/ /g) || []).length / 2);
+                let name = rawLine.replace(/^[| +\\-]*/, '').trim();
+
+                while (stack.length > 0 && stack[stack.length - 1][0] >= depth) {
+                    stack.pop();
+                }
+
+                if (stack.length > 0) {
+                    const parent = stack[stack.length - 1][1];
+                    if (name === parent) {
+                        name = `${name}_child`;
+                    }
+                    if (!graph[parent]) graph[parent] = [];
+                    graph[parent].push(name);
+                }
+
+                if (name) {
+                    if (!graph[name]) graph[name] = [];
+                    stack.push([depth, name]);
+                }
+            }
+
+            // Ensure Metazoa exists at root
+            const roots = findRoots(graph);
+            const metazoaChildren = roots.filter(r => r !== 'Metazoa');
+            graph['Metazoa'] = metazoaChildren;
+
+            return graph;
+        }
+
+        // UI handling
+        const form = document.getElementById('guesser-form');
+        const errorDiv = document.getElementById('error');
+        const resultDiv = document.getElementById('result');
+        const loadingDiv = document.getElementById('loading');
+        const resultName = document.getElementById('result-name');
+        const resultScientific = document.getElementById('result-scientific');
+
+        let graph = {};
+        let nameMap = {};
+
+        // Load data
+        async function loadData() {
+            try {
+                const treeRes = await fetch('commontree.txt');
+                const treeText = await treeRes.text();
+                graph = parseTaxonomyTree(treeText);
+
+                const mapRes = await fetch('name_map.json');
+                nameMap = await mapRes.json();
+            } catch (err) {
+                showError(`Failed to load data: ${err.message}`);
+            }
+        }
+
+        function showError(msg) {
+            errorDiv.textContent = msg;
+            errorDiv.classList.add('show');
+        }
+
+        function hideError() {
+            errorDiv.classList.remove('show');
+        }
+
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            hideError();
+
+            const clade = document.getElementById('clade').value.trim();
+            const exclusionsText = document.getElementById('exclusions').value.trim();
+            const exclusions = exclusionsText ? exclusionsText.split('\n').map(s => s.trim()).filter(s => s) : [];
+
+            if (!clade) {
+                showError('Please enter a clade');
+                return;
+            }
+
+            loadingDiv.classList.add('show');
+            resultDiv.classList.remove('show');
+
+            setTimeout(() => {
+                try {
+                    // Convert common names to scientific names
+                    const scientificMap = Object.fromEntries(Object.entries(nameMap).map(([k, v]) => [v, k]));
+                    const exclusionScientific = exclusions.map(s => scientificMap[s] || s);
+
+                    // Prune and guess
+                    const tree = pruneGraph(graph, clade, exclusionScientific);
+                    const guess = bestLeafGuess(tree);
+
+                    if (!guess) {
+                        showError(`No valid candidates found in clade "${clade}"`);
+                    } else {
+                        const commonName = nameMap[guess] || guess;
+                        resultName.textContent = commonName;
+                        resultScientific.textContent = `(${guess})`;
+                        resultDiv.classList.add('show');
+                    }
+                } catch (err) {
+                    showError(`Error: ${err.message}`);
+                }
+                loadingDiv.classList.remove('show');
+            }, 100);
+        });
+
+        // Initialize
+        loadData();
+    </script>
+</body>
+</html>

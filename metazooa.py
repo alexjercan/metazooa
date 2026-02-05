@@ -98,13 +98,13 @@ def prune_graph(graph: Dict[str, List[str]], clade: str, species: List[str]) -> 
     for node in species:
         parent = find_parent(graph, node)
         if parent is None:
-            return graph
+            continue
 
         while parent != clade:
             node = parent
             parent = find_parent(graph, node)
             if parent is None:
-                return graph
+                break
 
         remove_node(graph, node)
         children = graph.get(clade, [])
