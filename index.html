@@ -351,7 +351,7 @@
 
             if (candidates.length === 0) return null;
 
-            let bestGuess = null;
+            let bestGuesses = [];
             let bestWorstCase = Infinity;
 
             for (const guess of candidates) {
@@ -367,11 +367,14 @@
                 const worstCase = Math.max(...Object.values(buckets));
                 if (worstCase < bestWorstCase) {
                     bestWorstCase = worstCase;
-                    bestGuess = guess;
+                    bestGuesses = [];
+                }
+                if (worstCase === bestWorstCase) {
+                    bestGuesses.push(guess);
                 }
             }
 
-            return bestGuess;
+            return bestGuesses;
         }
 
         function jsonTreeToGraph(jsonTree, nameMap) {
@@ -430,6 +433,13 @@
             errorDiv.classList.remove('show');
         }
 
+        function chooseRandomGuess(guesses) {
+            if (guesses.length === 0) return null;
+
+            const idx = Math.floor(Math.random() * guesses.length);
+            return guesses[idx];
+        }
+
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             hideError();
@@ -454,11 +464,13 @@
 
                     // Prune and guess
                     const tree = pruneGraph(graph, clade, exclusionScientific);
-                    const guess = bestLeafGuess(tree);
+                    const guesses = bestLeafGuess(tree);
 
-                    if (!guess) {
+                    if (guesses.length === 0) {
                         showError(`No valid candidates found in clade "${clade}"`);
                     } else {
+                        let guess = chooseRandomGuess(guesses);
+
                         const commonName = nameMap[guess] || guess;
                         resultName.textContent = commonName;
                         resultScientific.textContent = `(${guess})`;
