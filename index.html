@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Metazooa Guesser</title>
+    <title id="page-title">Metazooa Guesser</title>
     <style>
         * {
             margin: 0;
@@ -170,6 +170,38 @@
             font-size: 13px;
             color: #888;
             font-style: italic;
+            margin-bottom: 16px;
+        }
+
+        .alternatives {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .alternatives-label {
+            font-size: 11px;
+            color: #aaa;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .alternative-item {
+            font-size: 12px;
+            color: #666;
+            padding: 6px 0;
+            line-height: 1.4;
+        }
+
+        .alternative-item .name {
+            font-weight: 500;
+            color: #555;
+        }
+
+        .alternative-item .scientific {
+            font-style: italic;
+            color: #999;
         }
 
         .error {
@@ -197,11 +229,55 @@
         .loading.show {
             display: block;
         }
+
+        .header-container {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .game-switcher {
+            display: flex;
+            gap: 8px;
+        }
+
+        .game-btn {
+            width: 36px;
+            height: 36px;
+            border: 2px solid var(--border);
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+            padding: 0;
+        }
+
+        .game-btn:hover {
+            border-color: var(--sage);
+            background: #f9f7f3;
+        }
+
+        .game-btn.active {
+            background: var(--sage);
+            border-color: var(--sage);
+            color: white;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Metazooa</h1>
+        <div class="header-container">
+            <h1 id="game-title">Metazooa</h1>
+            <div class="game-switcher">
+                <button type="button" class="game-btn active" id="btn-metazooa" title="Animals">🦁</button>
+                <button type="button" class="game-btn" id="btn-metaflora" title="Plants">🌿</button>
+            </div>
+        </div>
         <p class="subtitle">Find your perfect species</p>
 
         <div class="error" id="error"></div>
@@ -238,10 +314,51 @@
             <div class="result-label">Best Guess</div>
             <div class="result-species" id="result-name"></div>
             <div class="result-scientific" id="result-scientific"></div>
+
+            <div class="alternatives" id="alternatives" style="display: none;">
+                <div class="alternatives-label">Other Good Guesses</div>
+                <div id="alternatives-list"></div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Game configuration mapping
+        const GAME_CONFIG = {
+            metazooa: {
+                title: 'Metazooa',
+                subtitle: 'Find your perfect animal',
+                cladeExample: 'e.g., Mammalia, Aves, Insecta',
+                exampleSpecies: 'Dog, Cat, Dolphin'
+            },
+            metaflora: {
+                title: 'Metaflora',
+                subtitle: 'Find your perfect plant',
+                cladeExample: 'e.g., Magnoliopsida, Monocots, Eudicots',
+                exampleSpecies: 'Rose, Oak, Grass'
+            }
+        };
+
+        // Get game type from query params
+        function getGameType() {
+            const params = new URLSearchParams(window.location.search);
+            const game = params.get('game') || 'metazooa';
+            return game;
+        }
+
+        const GAME_TYPE = getGameType();
+        const GAME_INFO = GAME_CONFIG[GAME_TYPE] || GAME_CONFIG.metazooa;
+
+        // Update page with game-specific content
+        function initializeGameUI() {
+            document.getElementById('page-title').textContent = `${GAME_INFO.title} Guesser`;
+            document.getElementById('game-title').textContent = GAME_INFO.title;
+            document.querySelector('.subtitle').textContent = GAME_INFO.subtitle;
+            document.getElementById('clade').placeholder = GAME_INFO.cladeExample;
+            document.getElementById('exclusions').placeholder =
+                `One species per line\ne.g., ${GAME_INFO.exampleSpecies}`;
+        }
+
         // Taxonomy algorithms
         function findRoots(graph) {
             const allNodes = new Set(Object.keys(graph));
@@ -349,7 +466,7 @@
         function bestLeafGuess(tree) {
             const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
 
-            if (candidates.length === 0) return null;
+            if (candidates.length === 0) return [];
 
             let bestGuesses = [];
             let bestWorstCase = Infinity;
@@ -367,9 +484,8 @@
                 const worstCase = Math.max(...Object.values(buckets));
                 if (worstCase < bestWorstCase) {
                     bestWorstCase = worstCase;
-                    bestGuesses = [];
-                }
-                if (worstCase === bestWorstCase) {
+                    bestGuesses = [guess];
+                } else if (worstCase === bestWorstCase) {
                     bestGuesses.push(guess);
                 }
             }
@@ -409,6 +525,8 @@
         const loadingDiv = document.getElementById('loading');
         const resultName = document.getElementById('result-name');
         const resultScientific = document.getElementById('result-scientific');
+        const alternativesDiv = document.getElementById('alternatives');
+        const alternativesList = document.getElementById('alternatives-list');
 
         let graph = {};
         let nameMap = {};
@@ -416,7 +534,11 @@
         // Load data
         async function loadData() {
             try {
-                const treeRes = await fetch('commontree.json');
+                const treeFile = `commontree-${GAME_TYPE}.json`;
+                const treeRes = await fetch(treeFile);
+                if (!treeRes.ok) {
+                    throw new Error(`Could not load ${treeFile}`);
+                }
                 const treeJson = await treeRes.json();
                 graph = jsonTreeToGraph(treeJson, nameMap);
             } catch (err) {
@@ -435,7 +557,6 @@
 
         function chooseRandomGuess(guesses) {
             if (guesses.length === 0) return null;
-
             const idx = Math.floor(Math.random() * guesses.length);
             return guesses[idx];
         }
@@ -469,11 +590,29 @@
                     if (guesses.length === 0) {
                         showError(`No valid candidates found in clade "${clade}"`);
                     } else {
-                        let guess = chooseRandomGuess(guesses);
+                        const primaryGuess = chooseRandomGuess(guesses);
+                        const commonName = nameMap[primaryGuess] || primaryGuess;
 
-                        const commonName = nameMap[guess] || guess;
                         resultName.textContent = commonName;
-                        resultScientific.textContent = `(${guess})`;
+                        resultScientific.textContent = `(${primaryGuess})`;
+
+                        // Show alternatives if there are more than one
+                        if (guesses.length > 1) {
+                            const otherGuesses = guesses.filter(g => g !== primaryGuess);
+                            alternativesList.innerHTML = otherGuesses.map(guess => {
+                                const commonAlt = nameMap[guess] || guess;
+                                return `
+                                    <div class="alternative-item">
+                                        <span class="name">${commonAlt}</span><br>
+                                        <span class="scientific">${guess}</span>
+                                    </div>
+                                `;
+                            }).join('');
+                            alternativesDiv.style.display = 'block';
+                        } else {
+                            alternativesDiv.style.display = 'none';
+                        }
+
                         resultDiv.classList.add('show');
                     }
                 } catch (err) {
@@ -484,7 +623,26 @@
         });
 
         // Initialize
+        initializeGameUI();
         loadData();
+
+        // Game switcher buttons
+        document.getElementById('btn-metazooa').addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = '?game=metazooa';
+        });
+
+        document.getElementById('btn-metaflora').addEventListener('click', (e) => {
+            e.preventDefault();
+            window.location.href = '?game=metaflora';
+        });
+
+        // Update active button
+        function updateActiveButton() {
+            document.getElementById('btn-metazooa').classList.toggle('active', GAME_TYPE === 'metazooa');
+            document.getElementById('btn-metaflora').classList.toggle('active', GAME_TYPE === 'metaflora');
+        }
+        updateActiveButton();
     </script>
 </body>
 </html>
