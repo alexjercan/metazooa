@@ -156,6 +156,15 @@ def best_leaf_guess(tree: Dict[str, List[str]]) -> List[str]:
     return best_guesses
 
 
+def lowercase_tree(node: Dict) -> Dict:
+    node["scientific"] = node["scientific"].lower()
+    if "name" in node:
+        node["name"] = node["name"].lower()
+    if "children" in node:
+        node["children"] = [lowercase_tree(child) for child in node["children"]]
+    return node
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Find the best species guess for a given clade with optional exclusions"
@@ -206,6 +215,11 @@ if __name__ == "__main__":
         print(f"Error: {args.tree_file} not found")
         exit(1)
 
+    # Make the json_tree case insensitive for clade matching
+    json_tree = lowercase_tree(json_tree)
+    clade = args.clade.lower()
+    without = [s.strip().lower() for s in args.without.split(",") if s.strip()]
+
     # Convert JSON tree to graph and build name map
     graph: Dict[str, List[str]] = {}
     name_map: Dict[str, str] = {}
@@ -213,10 +227,10 @@ if __name__ == "__main__":
 
     # Convert common names to scientific names for exclusions
     scientific_map = {v: k for k, v in name_map.items()}
-    except_species = [scientific_map.get(s, s) for s in args.without.split(",") if s.strip()]
+    except_species = [scientific_map.get(s, s) for s in without]
 
     # Prune and guess
-    tree = prune_graph(dict(graph), args.clade, except_species)
+    tree = prune_graph(dict(graph), clade, except_species)
     guesses = best_leaf_guess(tree)
 
     if not guesses:
