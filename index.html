@@ -383,7 +383,7 @@
         function isAncestorOf(graph, ancestor, descendant) {
             let parent = findParent(graph, descendant);
             while (parent !== null) {
-                if (parent === ancestor) return true;
+                if (parent.toLowerCase() === ancestor.toLowerCase()) return true;
                 parent = findParent(graph, parent);
             }
             return false;
@@ -398,33 +398,58 @@
         }
 
         function pruneGraph(graph, clade, species) {
+            // Normalize clade to match actual graph key
+            const cladeLower = clade.toLowerCase();
+            let actualClade = null;
+            for (const key of Object.keys(graph)) {
+                if (key.toLowerCase() === cladeLower) {
+                    actualClade = key;
+                    break;
+                }
+            }
+
+            if (!actualClade) {
+                return {};
+            }
+
             // Keep only the clade and its ancestors
             const newGraph = {};
             for (const [k, v] of Object.entries(graph)) {
-                if (isAncestorOf(graph, clade, k) || k === clade) {
+                if (isAncestorOf(graph, actualClade, k) || k === actualClade) {
                     newGraph[k] = [...v];
                 }
             }
 
             let workingGraph = newGraph;
 
-            // Remove species
-            for (const node of species) {
-                let currentNode = node;
+            // Remove species (normalize to graph keys)
+            for (const speciesName of species) {
+                const speciesLower = speciesName.toLowerCase();
+                let actualSpecies = null;
+                for (const key of Object.keys(workingGraph)) {
+                    if (key.toLowerCase() === speciesLower) {
+                        actualSpecies = key;
+                        break;
+                    }
+                }
+
+                if (!actualSpecies) continue;
+
+                let currentNode = actualSpecies;
                 let parent = findParent(workingGraph, currentNode);
 
                 if (parent === null) continue;
 
-                while (parent !== clade) {
+                while (parent !== actualClade && parent !== null) {
                     currentNode = parent;
                     parent = findParent(workingGraph, currentNode);
                     if (parent === null) break;
                 }
 
-                if (parent === clade) {
+                if (parent && parent.toLowerCase() === actualClade.toLowerCase()) {
                     removeNode(workingGraph, currentNode);
-                    const children = workingGraph[clade] || [];
-                    workingGraph[clade] = children.filter(c => c !== currentNode);
+                    const children = workingGraph[actualClade] || [];
+                    workingGraph[actualClade] = children.filter(c => c !== currentNode);
                 }
             }
 
@@ -518,6 +543,24 @@
             return graph;
         }
 
+        function lowerCaseGraph(graph) {
+            const lowercaseGraph = {};
+            for (const [key, children] of Object.entries(graph)) {
+                const lowerKey = key.toLowerCase();
+                lowercaseGraph[lowerKey] = children.map(c => c.toLowerCase());
+            }
+            return lowercaseGraph;
+        }
+
+        function lowerCaseNameMap(nameMap) {
+            const lowercaseNameMap = {};
+            for (const [scientific, common] of Object.entries(nameMap)) {
+                const lowerScientific = scientific.toLowerCase();
+                lowercaseNameMap[lowerScientific] = common;
+            }
+            return lowercaseNameMap;
+        }
+
         // UI handling
         const form = document.getElementById('guesser-form');
         const errorDiv = document.getElementById('error');
@@ -541,6 +584,9 @@
                 }
                 const treeJson = await treeRes.json();
                 graph = jsonTreeToGraph(treeJson, nameMap);
+                // Convert to lowercase for case-insensitive matching
+                graph = lowerCaseGraph(graph);
+                nameMap = lowerCaseNameMap(nameMap);
             } catch (err) {
                 showError(`Failed to load data: ${err.message}`);
             }
@@ -579,9 +625,9 @@
 
             setTimeout(() => {
                 try {
-                    // Convert common names to scientific names
-                    const scientificMap = Object.fromEntries(Object.entries(nameMap).map(([k, v]) => [v, k]));
-                    const exclusionScientific = exclusions.map(s => scientificMap[s] || s);
+                    // Convert common names to scientific names (case-insensitive)
+                    const scientificMap = Object.fromEntries(Object.entries(nameMap).map(([k, v]) => [v.toLowerCase(), k]));
+                    const exclusionScientific = exclusions.map(s => scientificMap[s.toLowerCase()] || s);
 
                     // Prune and guess
                     const tree = pruneGraph(graph, clade, exclusionScientific);
