@@ -39,6 +39,15 @@ def is_ancestor_of(graph: Dict[str, List[str]], ancestor: str, descendant: str) 
     return False
 
 
+def lowercase_tree(node: Dict) -> Dict:
+    node["scientific"] = node["scientific"].lower()
+    if "name" in node:
+        node["name"] = node["name"].lower()
+    if "children" in node:
+        node["children"] = [lowercase_tree(child) for child in node["children"]]
+    return node
+
+
 def prune_graph(graph: Dict[str, List[str]], clade: str, species: List[str]) -> Dict[str, List[str]]:
     """Prune the graph to only include the specified clade, removing related species"""
     # Remove all other branches except the clade
@@ -154,15 +163,6 @@ def best_leaf_guess(tree: Dict[str, List[str]]) -> List[str]:
             best_guesses.append(guess)
 
     return best_guesses
-
-
-def lowercase_tree(node: Dict) -> Dict:
-    node["scientific"] = node["scientific"].lower()
-    if "name" in node:
-        node["name"] = node["name"].lower()
-    if "children" in node:
-        node["children"] = [lowercase_tree(child) for child in node["children"]]
-    return node
 
 
 if __name__ == "__main__":
