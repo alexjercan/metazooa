@@ -6,7 +6,7 @@ readme = "README.md"
 authors = [
     { name = "Alex Jercan", email = "jercan_alex27@yahoo.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 dependencies = [
     "beautifulsoup4>=4.14.3",
     "ete4>=4.4.0",

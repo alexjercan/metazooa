@@ -175,13 +175,27 @@ if __name__ == "__main__":
         default="commontree.json",
         help="Taxonomy tree file in JSON format (default: commontree.json)",
     )
+    parser.add_argument(
+        "--game",
+        default="metazooa",
+        help="Game to use for species data (metazooa or metaflora, default: metazooa)",
+    )
 
     args = parser.parse_args()
 
     # Check if we have the required files
     if os.path.isfile(args.tree_file) is False:
+        game = args.game.lower()
+        if game == "metazooa":
+            url = "https://metazooa.com/play/practice"
+        elif game == "metaflora":
+            url = "https://flora.metazooa.com/play/practice"
+        else:
+            print(f"Error: Invalid game '{args.game}', must be 'metazooa' or 'metaflora'")
+            exit(1)
+
         print(f"Error: {args.tree_file} not found, downloading...")
-        os.system("python3 scripts/get_species.py --requests 100 --mapping-file name_map.json")
+        os.system(f"python3 scripts/get_species.py --requests 100 --mapping-file name_map.json --url {url}")
         os.system(f"python3 scripts/generate_tree.py --names-file name_map.json --output {args.tree_file}")
 
     # Load JSON tree

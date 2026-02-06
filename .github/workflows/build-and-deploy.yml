@@ -31,11 +31,17 @@ jobs:
           python -m pip install --upgrade pip
           pip install requests beautifulsoup4 rich ete4
 
-      - name: Fetch taxonomy data
-        run: python scripts/get_species.py
+      - name: Fetch taxonomy data for metazooa
+        run: python scripts/get_species.py --url https://metazooa.com/play/practice
 
       - name: Generate phylogenetic tree
-        run: python scripts/generate_tree.py
+        run: python scripts/generate_tree.py --output commontree-metazooa.json
+
+      - name: Fetch taxonomy data for metazooa
+        run: python scripts/get_species.py --url https://flora.metazooa.com/play/practice
+
+      - name: Generate phylogenetic tree
+        run: python scripts/generate_tree.py --output commontree-metaflora.json
 
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3

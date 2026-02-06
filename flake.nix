@@ -82,6 +82,14 @@
             # Prefer build systems packages from source
             # pyproject-build-systems.overlays.sdist
             overlay
+
+            (final: prev: {
+              ete4 = prev.ete4.overrideAttrs (old: {
+                nativeBuildInputs =
+                  (old.nativeBuildInputs or [])
+                  ++ [ final.setuptools final.cython ];
+              });
+            })
           ]
         );
         # virtualenv = pythonSet.mkVirtualEnv "metazooa-dev-env" workspace.deps.all;

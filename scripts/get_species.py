@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+"""Scrape species data from metazooa.com and save to files."""
+
 import argparse
 import json
 from typing import List, Tuple
@@ -7,8 +10,7 @@ from bs4 import BeautifulSoup
 from rich.progress import track
 
 
-def get_species() -> Tuple[List[str], List[str]]:
-    url = "https://metazooa.com/play/practice"
+def get_species(url: str) -> Tuple[List[str], List[str]]:
     response = requests.get(url)
     response.raise_for_status()
 
@@ -48,13 +50,26 @@ if __name__ == "__main__":
         default="name_map.json",
         help="Output file for name mapping (default: name_map.json)",
     )
+    parser.add_argument(
+        "--url",
+        default="https://metazooa.com/play/practice",
+        help="URL to scrape species data from (default: https://metazooa.com/play/practice)",
+    )
 
     args = parser.parse_args()
+
+    url = args.url
+    # Validate URL either metazooa.com or flora.metazooa.com
+    if "metazooa.com" not in url:
+        raise ValueError("URL must be from metazooa.com or flora.metazooa.com")
+
+    game_name = "metazooa" if "flora" not in url else "metaflora"
+    print(f"Scraping species data from {game_name}...")
 
     name_map = {}
 
     for _ in track(range(args.requests), description="Getting species..."):
-        species, names = get_species()
+        species, names = get_species(url)
         for s, name in zip(species, names):
             name_map[s] = name
 
