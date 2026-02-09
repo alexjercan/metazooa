@@ -10,15 +10,14 @@ from copy import deepcopy
 from typing import Dict, List
 
 from guess_metazooa import best_leaf_guess, prepare_tree
-from play_metazooa import build_parent_map, evaluate_guess
-from rich.progress import Progress
-
-from scripts.helpers import (
+from helpers import (
     ensure_tree_file,
     get_all_leaves,
     is_ancestor_of,
     prune_graph,
 )
+from play_metazooa import build_parent_map, evaluate_guess
+from rich.progress import Progress
 
 
 def get_clade_species(graph: Dict[str, List[str]], clade: str) -> List[str]:
