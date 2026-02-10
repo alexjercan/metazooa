@@ -270,6 +270,64 @@
             color: white;
         }
 
+        .strategy-selector {
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #f9f7f3;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .strategy-label {
+            display: block;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+            color: var(--sage);
+        }
+
+        .strategy-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+        }
+
+        .strategy-btn {
+            width: 100%;
+            padding: 8px 12px;
+            background: white;
+            color: var(--sage);
+            border: 2px solid var(--border);
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: "Georgia", serif;
+        }
+
+        .strategy-btn:hover {
+            border-color: var(--sage);
+            background: #f0f0f0;
+        }
+
+        .strategy-btn.active {
+            background: var(--sage);
+            color: white;
+            border-color: var(--sage);
+        }
+
+        .strategy-description {
+            font-size: 11px;
+            color: #999;
+            margin-top: 8px;
+            font-style: italic;
+        }
+
         footer {
             margin-top: 48px;
             padding-top: 24px;
@@ -308,6 +366,16 @@
         <p class="subtitle">Find your perfect species</p>
 
         <div class="error" id="error"></div>
+
+        <div class="strategy-selector">
+            <label class="strategy-label">Strategy</label>
+            <div class="strategy-buttons">
+                <button type="button" class="strategy-btn active" id="btn-minimax" title="Worst-case optimal">Minimax</button>
+                <button type="button" class="strategy-btn" id="btn-entropy" title="Average-case optimal">Entropy</button>
+                <button type="button" class="strategy-btn" id="btn-hybrid" title="Balanced approach">Hybrid</button>
+            </div>
+            <p class="strategy-description" id="strategy-desc">Minimizes worst-case number of guesses</p>
+        </div>
 
         <form id="guesser-form">
             <div class="form-group">
@@ -372,6 +440,22 @@
             }
         };
 
+        // Strategy configuration mapping
+        const STRATEGY_CONFIG = {
+            minimax: {
+                title: 'Minimax',
+                description: 'Minimizes worst-case number of guesses'
+            },
+            entropy: {
+                title: 'Entropy',
+                description: 'Minimizes average-case number of guesses (information theory)'
+            },
+            hybrid: {
+                title: 'Hybrid',
+                description: 'Balanced approach combining minimax and entropy'
+            }
+        };
+
         // Get game type from query params
         function getGameType() {
             const params = new URLSearchParams(window.location.search);
@@ -379,8 +463,17 @@
             return game;
         }
 
+        // Get strategy from query params
+        function getStrategy() {
+            const params = new URLSearchParams(window.location.search);
+            const strategy = params.get('strategy') || 'minimax';
+            return strategy;
+        }
+
         const GAME_TYPE = getGameType();
+        const STRATEGY_TYPE = getStrategy();
         const GAME_INFO = GAME_CONFIG[GAME_TYPE] || GAME_CONFIG.metazooa;
+        const STRATEGY_INFO = STRATEGY_CONFIG[STRATEGY_TYPE] || STRATEGY_CONFIG.minimax;
 
         // Update page with game-specific content
         function initializeGameUI() {
@@ -390,6 +483,11 @@
             document.getElementById('clade').placeholder = GAME_INFO.cladeExample;
             document.getElementById('exclusions').placeholder =
                 `One species per line\ne.g., ${GAME_INFO.exampleSpecies}`;
+        }
+
+        // Update strategy description
+        function updateStrategyDescription() {
+            document.getElementById('strategy-desc').textContent = STRATEGY_INFO.description;
         }
 
         // Taxonomy algorithms
@@ -403,8 +501,6 @@
             }
             return Array.from(allNodes).filter(n => !children.has(n));
         }
-
-
 
         function findParent(graph, child) {
             for (const [parent, children] of Object.entries(graph)) {
@@ -433,7 +529,6 @@
         }
 
         function pruneGraph(graph, clade, species) {
-            // Normalize clade to match actual graph key
             const cladeLower = clade.toLowerCase();
             let actualClade = null;
             for (const key of Object.keys(graph)) {
@@ -447,7 +542,6 @@
                 return {};
             }
 
-            // Keep only the clade and its ancestors
             const newGraph = {};
             for (const [k, v] of Object.entries(graph)) {
                 if (isAncestorOf(graph, actualClade, k) || k === actualClade) {
@@ -457,7 +551,6 @@
 
             let workingGraph = newGraph;
 
-            // Remove species (normalize to graph keys)
             for (const speciesName of species) {
                 const speciesLower = speciesName.toLowerCase();
                 let actualSpecies = null;
@@ -523,7 +616,12 @@
             return y;
         }
 
-        function bestLeafGuess(tree) {
+        function computeEntropy(size) {
+            if (size <= 1) return 0;
+            return Math.log2(size);
+        }
+
+        function bestLeafGuessMinimax(tree) {
             const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
 
             if (candidates.length === 0) return [];
@@ -553,6 +651,116 @@
             return bestGuesses;
         }
 
+        function bestLeafGuessEntropy(tree) {
+            const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
+
+            if (candidates.length === 0) return [];
+
+            const initialEntropy = computeEntropy(candidates.length);
+
+            if (initialEntropy === 0) return candidates;
+
+            let bestInfoGain = -1;
+            let bestGuesses = [];
+
+            for (const guess of candidates) {
+                const feedbackGroups = {};
+
+                for (const leaf of candidates) {
+                    const clade = lca(tree, guess, leaf);
+                    feedbackGroups[clade] = (feedbackGroups[clade] || 0) + 1;
+                }
+
+                let expectedEntropyAfter = 0;
+                const total = candidates.length;
+
+                for (const groupSize of Object.values(feedbackGroups)) {
+                    const prob = groupSize / total;
+                    const groupEntropy = computeEntropy(groupSize);
+                    expectedEntropyAfter += prob * groupEntropy;
+                }
+
+                const infoGain = initialEntropy - expectedEntropyAfter;
+
+                if (infoGain > bestInfoGain + 1e-9) {
+                    bestInfoGain = infoGain;
+                    bestGuesses = [guess];
+                } else if (Math.abs(infoGain - bestInfoGain) < 1e-9) {
+                    bestGuesses.push(guess);
+                }
+            }
+
+            return bestGuesses;
+        }
+
+        function bestLeafGuessHybrid(tree) {
+            const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
+
+            if (candidates.length === 0) return [];
+
+            const initialEntropy = computeEntropy(candidates.length);
+            const scores = {};
+
+            // Calculate scores for each candidate
+            for (const guess of candidates) {
+                const feedbackGroups = {};
+
+                for (const leaf of candidates) {
+                    const clade = lca(tree, guess, leaf);
+                    feedbackGroups[clade] = (feedbackGroups[clade] || 0) + 1;
+                }
+
+                const worstCase = Math.max(...Object.values(feedbackGroups));
+                let expectedEntropyAfter = 0;
+                const total = candidates.length;
+
+                for (const groupSize of Object.values(feedbackGroups)) {
+                    const prob = groupSize / total;
+                    const groupEntropy = computeEntropy(groupSize);
+                    expectedEntropyAfter += prob * groupEntropy;
+                }
+
+                const infoGain = initialEntropy - expectedEntropyAfter;
+
+                scores[guess] = {
+                    worstCase: worstCase,
+                    infoGain: infoGain
+                };
+            }
+
+            // Normalize and combine scores
+            const worstCases = Object.values(scores).map(s => s.worstCase);
+            const infoGains = Object.values(scores).map(s => s.infoGain);
+
+            const minWorst = Math.min(...worstCases);
+            const maxWorst = Math.max(...worstCases);
+            const minGain = Math.min(...infoGains);
+            const maxGain = Math.max(...infoGains);
+
+            const worstRange = maxWorst > minWorst ? maxWorst - minWorst : 1;
+            const gainRange = maxGain > minGain ? maxGain - minGain : 1;
+
+            let bestHybridScore = -Infinity;
+            let bestGuesses = [];
+
+            for (const guess of candidates) {
+                const worstNorm = (scores[guess].worstCase - minWorst) / worstRange;
+                const gainNorm = (scores[guess].infoGain - minGain) / gainRange;
+
+                // Balanced: prefer higher info gain (entropy) but also consider worst case
+                const hybridScore = 0.5 * gainNorm + 0.5 * (1 - worstNorm);
+
+                if (hybridScore > bestHybridScore + 1e-9) {
+                    bestHybridScore = hybridScore;
+                    bestGuesses = [guess];
+                } else if (Math.abs(hybridScore - bestHybridScore) < 1e-9) {
+                    bestGuesses.push(guess);
+                }
+            }
+
+            return bestGuesses;
+        }
+
         function jsonTreeToGraph(jsonTree, nameMap) {
             const graph = {};
 
@@ -560,7 +768,6 @@
                 const scientific = node.scientific;
                 graph[scientific] = [];
 
-                // Build name map from tree
                 if (node.scientific && node.name) {
                     nameMap[node.scientific] = node.name;
                 }
@@ -619,7 +826,6 @@
                 }
                 const treeJson = await treeRes.json();
                 graph = jsonTreeToGraph(treeJson, nameMap);
-                // Convert to lowercase for case-insensitive matching
                 graph = lowerCaseGraph(graph);
                 nameMap = lowerCaseNameMap(nameMap);
             } catch (err) {
@@ -660,13 +866,21 @@
 
             setTimeout(() => {
                 try {
-                    // Convert common names to scientific names (case-insensitive)
                     const scientificMap = Object.fromEntries(Object.entries(nameMap).map(([k, v]) => [v.toLowerCase(), k]));
                     const exclusionScientific = exclusions.map(s => scientificMap[s.toLowerCase()] || s);
 
-                    // Prune and guess
                     const tree = pruneGraph(graph, clade, exclusionScientific);
-                    const guesses = bestLeafGuess(tree);
+
+                    let guesses;
+                    if (STRATEGY_TYPE === 'minimax') {
+                        guesses = bestLeafGuessMinimax(tree);
+                    } else if (STRATEGY_TYPE === 'entropy') {
+                        guesses = bestLeafGuessEntropy(tree);
+                    } else if (STRATEGY_TYPE === 'hybrid') {
+                        guesses = bestLeafGuessHybrid(tree);
+                    } else {
+                        guesses = bestLeafGuessMinimax(tree);
+                    }
 
                     if (guesses.length === 0) {
                         showError(`No valid candidates found in clade "${clade}"`);
@@ -677,7 +891,6 @@
                         resultName.textContent = commonName;
                         resultScientific.textContent = `(${primaryGuess})`;
 
-                        // Show alternatives if there are more than one
                         if (guesses.length > 1) {
                             const otherGuesses = guesses.filter(g => g !== primaryGuess);
                             alternativesList.innerHTML = otherGuesses.map(guess => {
@@ -705,25 +918,55 @@
 
         // Initialize
         initializeGameUI();
+        updateStrategyDescription();
         loadData();
 
         // Game switcher buttons
         document.getElementById('btn-metazooa').addEventListener('click', (e) => {
             e.preventDefault();
-            window.location.href = '?game=metazooa';
+            const params = new URLSearchParams(window.location.search);
+            params.set('game', 'metazooa');
+            window.location.href = `?${params.toString()}`;
         });
 
         document.getElementById('btn-metaflora').addEventListener('click', (e) => {
             e.preventDefault();
-            window.location.href = '?game=metaflora';
+            const params = new URLSearchParams(window.location.search);
+            params.set('game', 'metaflora');
+            window.location.href = `?${params.toString()}`;
         });
 
-        // Update active button
-        function updateActiveButton() {
+        // Strategy switcher buttons
+        document.getElementById('btn-minimax').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('strategy', 'minimax');
+            window.location.href = `?${params.toString()}`;
+        });
+
+        document.getElementById('btn-entropy').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('strategy', 'entropy');
+            window.location.href = `?${params.toString()}`;
+        });
+
+        document.getElementById('btn-hybrid').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('strategy', 'hybrid');
+            window.location.href = `?${params.toString()}`;
+        });
+
+        // Update active buttons
+        function updateActiveButtons() {
             document.getElementById('btn-metazooa').classList.toggle('active', GAME_TYPE === 'metazooa');
             document.getElementById('btn-metaflora').classList.toggle('active', GAME_TYPE === 'metaflora');
+            document.getElementById('btn-minimax').classList.toggle('active', STRATEGY_TYPE === 'minimax');
+            document.getElementById('btn-entropy').classList.toggle('active', STRATEGY_TYPE === 'entropy');
+            document.getElementById('btn-hybrid').classList.toggle('active', STRATEGY_TYPE === 'hybrid');
         }
-        updateActiveButton();
+        updateActiveButtons();
     </script>
 </body>
 </html>
