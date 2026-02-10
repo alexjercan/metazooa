@@ -782,6 +782,15 @@
             return parseInt(document.getElementById('entropy-weight-slider').value) / 100;
         }
 
+        // Helper to remove a node (and its descendants) from a graph
+        function removeNode(graphObj, node) {
+            const children = graphObj[node] || [];
+            delete graphObj[node];
+            for (const child of children) {
+                if (graphObj[child]) removeNode(graphObj, child);
+            }
+        }
+
         // Form submission
         form.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -817,15 +826,63 @@
                         return;
                     }
 
-                    // Prune tree
+                    // Prune tree: keep only nodes that are descendants of actualClade
                     const prunedTree = {};
-                    function isAncestor(node) {
+                    function isDescendant(node) {
                         if (node === actualClade) return true;
                         const parent = findParent(graph, node);
-                        return parent ? isAncestor(parent) : false;
+                        return parent ? isDescendant(parent) : false;
                     }
                     for (const [k, v] of Object.entries(graph)) {
-                        if (isAncestor(k)) prunedTree[k] = v;
+                        if (isDescendant(k)) {
+                            // copy array (so we can mutate safely later)
+                            prunedTree[k] = Array.isArray(v) ? v.slice() : [];
+                        }
+                    }
+
+                    // Build inverse name map: common name (lowercased) -> scientific key
+                    const commonToScientific = {};
+                    for (const [sci, common] of Object.entries(nameMap)) {
+                        if (typeof common === 'string') {
+                            commonToScientific[common.toLowerCase()] = sci;
+                        }
+                    }
+
+                    // Remove excluded species (map common names to scientific if needed)
+                    // We remove the whole child subtree of the clade that contains the excluded species,
+                    // matching the Python prune_graph behavior.
+                    for (let ex of exclusions) {
+                        const target = commonToScientific[ex] || ex; // scientific name if known, otherwise assume input is scientific
+                        // If the target is not present in prunedTree, skip
+                        if (!Object.prototype.hasOwnProperty.call(prunedTree, target)) {
+                            // It may be a leaf that wasn't a key yet (shouldn't happen because traverse created keys for leaves),
+                            // or it's outside the clade — skip quietly.
+                            continue;
+                        }
+
+                        // Walk up until we reach the direct child of actualClade
+                        let node = target;
+                        let parent = findParent(prunedTree, node);
+                        if (parent === null) {
+                            // nothing to remove
+                            continue;
+                        }
+                        while (parent !== actualClade) {
+                            node = parent;
+                            parent = findParent(prunedTree, node);
+                            if (parent === null) break;
+                        }
+                        // remove the node subtree from prunedTree
+                        if (node && Object.prototype.hasOwnProperty.call(prunedTree, node)) {
+                            removeNode(prunedTree, node);
+                        }
+                        // also remove the node from the actualClade children list if present
+                        const cladeChildren = prunedTree[actualClade] || [];
+                        const idx = cladeChildren.indexOf(node);
+                        if (idx !== -1) {
+                            cladeChildren.splice(idx, 1);
+                            prunedTree[actualClade] = cladeChildren;
+                        }
                     }
 
                     let guesses;
