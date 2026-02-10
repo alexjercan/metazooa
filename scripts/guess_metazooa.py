@@ -127,7 +127,7 @@ def best_leaf_guess_hybrid(tree: Dict[str, List[str]], entropy_weight: float = 0
     scores = {}
 
     for guess in candidates:
-        # Minimax: worst-case group size
+        # Minmax: worst-case group size
         feedback_groups_minmax: Dict[str, int] = defaultdict(int)
         for leaf in candidates:
             clade = lca(tree, guess, leaf)

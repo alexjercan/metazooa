@@ -451,7 +451,7 @@
         <div class="strategy-selector">
             <label class="strategy-label">Strategy</label>
             <div class="strategy-buttons">
-                <button type="button" class="strategy-btn active" id="btn-minimax">Minimax</button>
+                <button type="button" class="strategy-btn active" id="btn-minmax">Minmax</button>
                 <button type="button" class="strategy-btn" id="btn-entropy">Entropy</button>
                 <button type="button" class="strategy-btn" id="btn-hybrid">Hybrid</button>
             </div>
@@ -464,7 +464,7 @@
                 </div>
                 <input type="range" id="entropy-weight-slider" min="0" max="100" value="50">
                 <div class="slider-labels">
-                    <span>← Minimax</span>
+                    <span>← Minmax</span>
                     <span>Entropy →</span>
                 </div>
             </div>
@@ -526,7 +526,7 @@
         // Get strategy from query params
         function getStrategy() {
             const params = new URLSearchParams(window.location.search);
-            return params.get('strategy') || 'minimax';
+            return params.get('strategy') || 'minmax';
         }
 
         let currentGame = getGameType();
@@ -554,12 +554,12 @@
         function updateStrategyUI(strategy) {
             currentStrategy = strategy;
             const config = {
-                minimax: 'Minimizes worst-case number of guesses',
+                minmax: 'Minimizes worst-case number of guesses',
                 entropy: 'Minimizes average-case number of guesses (information theory)',
-                hybrid: 'Balanced approach combining minimax and entropy'
+                hybrid: 'Balanced approach combining minmax and entropy'
             };
-            document.getElementById('strategy-desc').textContent = config[strategy] || config.minimax;
-            document.getElementById('btn-minimax').classList.toggle('active', strategy === 'minimax');
+            document.getElementById('strategy-desc').textContent = config[strategy] || config.minmax;
+            document.getElementById('btn-minmax').classList.toggle('active', strategy === 'minmax');
             document.getElementById('btn-entropy').classList.toggle('active', strategy === 'entropy');
             document.getElementById('btn-hybrid').classList.toggle('active', strategy === 'hybrid');
 
@@ -614,7 +614,7 @@
             return Math.log2(size);
         }
 
-        function bestLeafGuessMinimax(tree) {
+        function bestLeafGuessMinmax(tree) {
             const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
             if (candidates.length === 0) return [];
 
@@ -829,15 +829,15 @@
                     }
 
                     let guesses;
-                    if (currentStrategy === 'minimax') {
-                        guesses = bestLeafGuessMinimax(prunedTree);
+                    if (currentStrategy === 'minmax') {
+                        guesses = bestLeafGuessMinmax(prunedTree);
                     } else if (currentStrategy === 'entropy') {
                         guesses = bestLeafGuessEntropy(prunedTree);
                     } else if (currentStrategy === 'hybrid') {
                         const weight = getEntropyWeight();
                         guesses = bestLeafGuessHybrid(prunedTree, weight);
                     } else {
-                        guesses = bestLeafGuessMinimax(prunedTree);
+                        guesses = bestLeafGuessMinmax(prunedTree);
                     }
 
                     if (guesses.length === 0) {
@@ -876,12 +876,12 @@
         });
 
         // Strategy buttons
-        document.getElementById('btn-minimax').addEventListener('click', (e) => {
+        document.getElementById('btn-minmax').addEventListener('click', (e) => {
             e.preventDefault();
             const params = new URLSearchParams(window.location.search);
-            params.set('strategy', 'minimax');
+            params.set('strategy', 'minmax');
             window.history.pushState({}, '', `?${params.toString()}`);
-            updateStrategyUI('minimax');
+            updateStrategyUI('minmax');
         });
 
         document.getElementById('btn-entropy').addEventListener('click', (e) => {
