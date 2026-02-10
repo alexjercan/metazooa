@@ -70,7 +70,8 @@
             color: var(--sage);
         }
 
-        input, textarea {
+        input[type="text"],
+        textarea {
             width: 100%;
             padding: 12px;
             border: 1px solid var(--border);
@@ -81,7 +82,8 @@
             transition: all 0.2s;
         }
 
-        input:focus, textarea:focus {
+        input[type="text"]:focus,
+        textarea:focus {
             outline: none;
             border-color: var(--sage);
             background: white;
@@ -101,7 +103,7 @@
             font-style: italic;
         }
 
-        button {
+        .btn-submit {
             width: 100%;
             padding: 14px;
             background: var(--sage);
@@ -117,13 +119,13 @@
             font-family: "Georgia", serif;
         }
 
-        button:hover:not(:disabled) {
+        .btn-submit:hover:not(:disabled) {
             background: #5a7b5e;
             transform: translateY(-1px);
             box-shadow: 0 4px 12px rgba(107, 142, 111, 0.2);
         }
 
-        button:disabled {
+        .btn-submit:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
@@ -328,6 +330,85 @@
             font-style: italic;
         }
 
+        .hybrid-slider-container {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .hybrid-slider-container.show {
+            display: block;
+        }
+
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--sage);
+            margin-bottom: 8px;
+        }
+
+        .slider-value {
+            font-family: monospace;
+            font-weight: 700;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: var(--border);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--sage);
+            cursor: pointer;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-webkit-slider-thumb:hover {
+            box-shadow: 0 2px 8px rgba(107, 142, 111, 0.3);
+            transform: scale(1.1);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--sage);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: all 0.2s;
+        }
+
+        input[type="range"]::-moz-range-thumb:hover {
+            box-shadow: 0 2px 8px rgba(107, 142, 111, 0.3);
+            transform: scale(1.1);
+        }
+
+        .slider-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #999;
+            margin-top: 6px;
+        }
+
         footer {
             margin-top: 48px;
             padding-top: 24px;
@@ -370,11 +451,23 @@
         <div class="strategy-selector">
             <label class="strategy-label">Strategy</label>
             <div class="strategy-buttons">
-                <button type="button" class="strategy-btn active" id="btn-minimax" title="Worst-case optimal">Minimax</button>
-                <button type="button" class="strategy-btn" id="btn-entropy" title="Average-case optimal">Entropy</button>
-                <button type="button" class="strategy-btn" id="btn-hybrid" title="Balanced approach">Hybrid</button>
+                <button type="button" class="strategy-btn active" id="btn-minimax">Minimax</button>
+                <button type="button" class="strategy-btn" id="btn-entropy">Entropy</button>
+                <button type="button" class="strategy-btn" id="btn-hybrid">Hybrid</button>
             </div>
             <p class="strategy-description" id="strategy-desc">Minimizes worst-case number of guesses</p>
+
+            <div class="hybrid-slider-container" id="hybrid-slider-container">
+                <div class="slider-label">
+                    <span>Entropy Weight</span>
+                    <span class="slider-value" id="slider-value">0.50</span>
+                </div>
+                <input type="range" id="entropy-weight-slider" min="0" max="100" value="50">
+                <div class="slider-labels">
+                    <span>← Minimax</span>
+                    <span>Entropy →</span>
+                </div>
+            </div>
         </div>
 
         <form id="guesser-form">
@@ -400,7 +493,7 @@
                 <p class="help-text">Enter species names (common names or scientific names)</p>
             </div>
 
-            <button type="submit">Find Best Guess</button>
+            <button type="submit" class="btn-submit">Find Best Guess</button>
         </form>
 
         <div class="loading" id="loading">Processing...</div>
@@ -424,164 +517,66 @@
     </div>
 
     <script>
-        // Game configuration mapping
-        const GAME_CONFIG = {
-            metazooa: {
-                title: 'Metazooa',
-                subtitle: 'Find your perfect animal',
-                cladeExample: 'e.g., Mammalia, Aves, Insecta',
-                exampleSpecies: 'Dog, Cat, Dolphin'
-            },
-            metaflora: {
-                title: 'Metaflora',
-                subtitle: 'Find your perfect plant',
-                cladeExample: 'e.g., Magnoliopsida, Monocots, Eudicots',
-                exampleSpecies: 'Rose, Oak, Grass'
-            }
-        };
-
-        // Strategy configuration mapping
-        const STRATEGY_CONFIG = {
-            minimax: {
-                title: 'Minimax',
-                description: 'Minimizes worst-case number of guesses'
-            },
-            entropy: {
-                title: 'Entropy',
-                description: 'Minimizes average-case number of guesses (information theory)'
-            },
-            hybrid: {
-                title: 'Hybrid',
-                description: 'Balanced approach combining minimax and entropy'
-            }
-        };
-
         // Get game type from query params
         function getGameType() {
             const params = new URLSearchParams(window.location.search);
-            const game = params.get('game') || 'metazooa';
-            return game;
+            return params.get('game') || 'metazooa';
         }
 
         // Get strategy from query params
         function getStrategy() {
             const params = new URLSearchParams(window.location.search);
-            const strategy = params.get('strategy') || 'minimax';
-            return strategy;
+            return params.get('strategy') || 'minimax';
         }
 
-        const GAME_TYPE = getGameType();
-        const STRATEGY_TYPE = getStrategy();
-        const GAME_INFO = GAME_CONFIG[GAME_TYPE] || GAME_CONFIG.metazooa;
-        const STRATEGY_INFO = STRATEGY_CONFIG[STRATEGY_TYPE] || STRATEGY_CONFIG.minimax;
+        let currentGame = getGameType();
+        let currentStrategy = getStrategy();
 
         // Update page with game-specific content
-        function initializeGameUI() {
-            document.getElementById('page-title').textContent = `${GAME_INFO.title} Guesser`;
-            document.getElementById('game-title').textContent = GAME_INFO.title;
-            document.querySelector('.subtitle').textContent = GAME_INFO.subtitle;
-            document.getElementById('clade').placeholder = GAME_INFO.cladeExample;
-            document.getElementById('exclusions').placeholder =
-                `One species per line\ne.g., ${GAME_INFO.exampleSpecies}`;
+        function updateGameUI(game) {
+            const config = {
+                metazooa: {
+                    title: 'Metazooa',
+                    subtitle: 'Find your perfect animal'
+                },
+                metaflora: {
+                    title: 'Metaflora',
+                    subtitle: 'Find your perfect plant'
+                }
+            };
+            const info = config[game] || config.metazooa;
+            document.getElementById('page-title').textContent = `${info.title} Guesser`;
+            document.getElementById('game-title').textContent = info.title;
+            document.querySelector('.subtitle').textContent = info.subtitle;
         }
 
         // Update strategy description
-        function updateStrategyDescription() {
-            document.getElementById('strategy-desc').textContent = STRATEGY_INFO.description;
+        function updateStrategyUI(strategy) {
+            currentStrategy = strategy;
+            const config = {
+                minimax: 'Minimizes worst-case number of guesses',
+                entropy: 'Minimizes average-case number of guesses (information theory)',
+                hybrid: 'Balanced approach combining minimax and entropy'
+            };
+            document.getElementById('strategy-desc').textContent = config[strategy] || config.minimax;
+            document.getElementById('btn-minimax').classList.toggle('active', strategy === 'minimax');
+            document.getElementById('btn-entropy').classList.toggle('active', strategy === 'entropy');
+            document.getElementById('btn-hybrid').classList.toggle('active', strategy === 'hybrid');
+
+            const sliderContainer = document.getElementById('hybrid-slider-container');
+            if (strategy === 'hybrid') {
+                sliderContainer.classList.add('show');
+            } else {
+                sliderContainer.classList.remove('show');
+            }
         }
 
         // Taxonomy algorithms
-        function findRoots(graph) {
-            const allNodes = new Set(Object.keys(graph));
-            const children = new Set();
-            for (const kids of Object.values(graph)) {
-                for (const child of kids) {
-                    children.add(child);
-                }
-            }
-            return Array.from(allNodes).filter(n => !children.has(n));
-        }
-
         function findParent(graph, child) {
             for (const [parent, children] of Object.entries(graph)) {
-                if (children.includes(child)) {
-                    return parent;
-                }
+                if (children.includes(child)) return parent;
             }
             return null;
-        }
-
-        function isAncestorOf(graph, ancestor, descendant) {
-            let parent = findParent(graph, descendant);
-            while (parent !== null) {
-                if (parent.toLowerCase() === ancestor.toLowerCase()) return true;
-                parent = findParent(graph, parent);
-            }
-            return false;
-        }
-
-        function removeNode(graph, node) {
-            const children = graph[node] || [];
-            delete graph[node];
-            for (const child of children) {
-                removeNode(graph, child);
-            }
-        }
-
-        function pruneGraph(graph, clade, species) {
-            const cladeLower = clade.toLowerCase();
-            let actualClade = null;
-            for (const key of Object.keys(graph)) {
-                if (key.toLowerCase() === cladeLower) {
-                    actualClade = key;
-                    break;
-                }
-            }
-
-            if (!actualClade) {
-                return {};
-            }
-
-            const newGraph = {};
-            for (const [k, v] of Object.entries(graph)) {
-                if (isAncestorOf(graph, actualClade, k) || k === actualClade) {
-                    newGraph[k] = [...v];
-                }
-            }
-
-            let workingGraph = newGraph;
-
-            for (const speciesName of species) {
-                const speciesLower = speciesName.toLowerCase();
-                let actualSpecies = null;
-                for (const key of Object.keys(workingGraph)) {
-                    if (key.toLowerCase() === speciesLower) {
-                        actualSpecies = key;
-                        break;
-                    }
-                }
-
-                if (!actualSpecies) continue;
-
-                let currentNode = actualSpecies;
-                let parent = findParent(workingGraph, currentNode);
-
-                if (parent === null) continue;
-
-                while (parent !== actualClade && parent !== null) {
-                    currentNode = parent;
-                    parent = findParent(workingGraph, currentNode);
-                    if (parent === null) break;
-                }
-
-                if (parent && parent.toLowerCase() === actualClade.toLowerCase()) {
-                    removeNode(workingGraph, currentNode);
-                    const children = workingGraph[actualClade] || [];
-                    workingGraph[actualClade] = children.filter(c => c !== currentNode);
-                }
-            }
-
-            return workingGraph;
         }
 
         function isLeaf(graph, node) {
@@ -601,14 +596,12 @@
         function lca(tree, a, b) {
             const parentMap = buildParentMap(tree);
             const ancestors = new Set();
-
             let x = a;
             while (x in parentMap) {
                 ancestors.add(x);
                 x = parentMap[x];
             }
             ancestors.add(x);
-
             let y = b;
             while (!ancestors.has(y)) {
                 y = parentMap[y];
@@ -623,7 +616,6 @@
 
         function bestLeafGuessMinimax(tree) {
             const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
-
             if (candidates.length === 0) return [];
 
             let bestGuesses = [];
@@ -631,14 +623,11 @@
 
             for (const guess of candidates) {
                 const buckets = {};
-
                 for (const leaf of candidates) {
                     const clade = lca(tree, guess, leaf);
                     buckets[clade] = (buckets[clade] || 0) + 1;
-
                     if (buckets[clade] >= bestWorstCase) break;
                 }
-
                 const worstCase = Math.max(...Object.values(buckets));
                 if (worstCase < bestWorstCase) {
                     bestWorstCase = worstCase;
@@ -647,17 +636,14 @@
                     bestGuesses.push(guess);
                 }
             }
-
             return bestGuesses;
         }
 
         function bestLeafGuessEntropy(tree) {
             const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
-
             if (candidates.length === 0) return [];
 
             const initialEntropy = computeEntropy(candidates.length);
-
             if (initialEntropy === 0) return candidates;
 
             let bestInfoGain = -1;
@@ -665,7 +651,6 @@
 
             for (const guess of candidates) {
                 const feedbackGroups = {};
-
                 for (const leaf of candidates) {
                     const clade = lca(tree, guess, leaf);
                     feedbackGroups[clade] = (feedbackGroups[clade] || 0) + 1;
@@ -673,7 +658,6 @@
 
                 let expectedEntropyAfter = 0;
                 const total = candidates.length;
-
                 for (const groupSize of Object.values(feedbackGroups)) {
                     const prob = groupSize / total;
                     const groupEntropy = computeEntropy(groupSize);
@@ -681,7 +665,6 @@
                 }
 
                 const infoGain = initialEntropy - expectedEntropyAfter;
-
                 if (infoGain > bestInfoGain + 1e-9) {
                     bestInfoGain = infoGain;
                     bestGuesses = [guess];
@@ -689,22 +672,18 @@
                     bestGuesses.push(guess);
                 }
             }
-
             return bestGuesses;
         }
 
-        function bestLeafGuessHybrid(tree) {
+        function bestLeafGuessHybrid(tree, entropyWeight = 0.5) {
             const candidates = Object.keys(tree).filter(node => isLeaf(tree, node));
-
             if (candidates.length === 0) return [];
 
             const initialEntropy = computeEntropy(candidates.length);
             const scores = {};
 
-            // Calculate scores for each candidate
             for (const guess of candidates) {
                 const feedbackGroups = {};
-
                 for (const leaf of candidates) {
                     const clade = lca(tree, guess, leaf);
                     feedbackGroups[clade] = (feedbackGroups[clade] || 0) + 1;
@@ -713,30 +692,22 @@
                 const worstCase = Math.max(...Object.values(feedbackGroups));
                 let expectedEntropyAfter = 0;
                 const total = candidates.length;
-
                 for (const groupSize of Object.values(feedbackGroups)) {
                     const prob = groupSize / total;
                     const groupEntropy = computeEntropy(groupSize);
                     expectedEntropyAfter += prob * groupEntropy;
                 }
-
                 const infoGain = initialEntropy - expectedEntropyAfter;
 
-                scores[guess] = {
-                    worstCase: worstCase,
-                    infoGain: infoGain
-                };
+                scores[guess] = { worstCase, infoGain };
             }
 
-            // Normalize and combine scores
             const worstCases = Object.values(scores).map(s => s.worstCase);
             const infoGains = Object.values(scores).map(s => s.infoGain);
-
             const minWorst = Math.min(...worstCases);
             const maxWorst = Math.max(...worstCases);
             const minGain = Math.min(...infoGains);
             const maxGain = Math.max(...infoGains);
-
             const worstRange = maxWorst > minWorst ? maxWorst - minWorst : 1;
             const gainRange = maxGain > minGain ? maxGain - minGain : 1;
 
@@ -746,9 +717,7 @@
             for (const guess of candidates) {
                 const worstNorm = (scores[guess].worstCase - minWorst) / worstRange;
                 const gainNorm = (scores[guess].infoGain - minGain) / gainRange;
-
-                // Balanced: prefer higher info gain (entropy) but also consider worst case
-                const hybridScore = 0.5 * gainNorm + 0.5 * (1 - worstNorm);
+                const hybridScore = entropyWeight * gainNorm + (1 - entropyWeight) * (1 - worstNorm);
 
                 if (hybridScore > bestHybridScore + 1e-9) {
                     bestHybridScore = hybridScore;
@@ -757,53 +726,10 @@
                     bestGuesses.push(guess);
                 }
             }
-
             return bestGuesses;
         }
 
-        function jsonTreeToGraph(jsonTree, nameMap) {
-            const graph = {};
-
-            function traverse(node) {
-                const scientific = node.scientific;
-                graph[scientific] = [];
-
-                if (node.scientific && node.name) {
-                    nameMap[node.scientific] = node.name;
-                }
-
-                if (node.children) {
-                    for (const child of node.children) {
-                        const childScientific = child.scientific;
-                        graph[scientific].push(childScientific);
-                        traverse(child);
-                    }
-                }
-            }
-
-            traverse(jsonTree);
-            return graph;
-        }
-
-        function lowerCaseGraph(graph) {
-            const lowercaseGraph = {};
-            for (const [key, children] of Object.entries(graph)) {
-                const lowerKey = key.toLowerCase();
-                lowercaseGraph[lowerKey] = children.map(c => c.toLowerCase());
-            }
-            return lowercaseGraph;
-        }
-
-        function lowerCaseNameMap(nameMap) {
-            const lowercaseNameMap = {};
-            for (const [scientific, common] of Object.entries(nameMap)) {
-                const lowerScientific = scientific.toLowerCase();
-                lowercaseNameMap[lowerScientific] = common;
-            }
-            return lowercaseNameMap;
-        }
-
-        // UI handling
+        // UI helpers
         const form = document.getElementById('guesser-form');
         const errorDiv = document.getElementById('error');
         const resultDiv = document.getElementById('result');
@@ -819,15 +745,25 @@
         // Load data
         async function loadData() {
             try {
-                const treeFile = `commontree-${GAME_TYPE}.json`;
-                const treeRes = await fetch(treeFile);
-                if (!treeRes.ok) {
-                    throw new Error(`Could not load ${treeFile}`);
+                const treeFile = `commontree-${currentGame}.json`;
+                const res = await fetch(treeFile);
+                if (!res.ok) throw new Error(`Could not load ${treeFile}`);
+                const json = await res.json();
+
+                // Parse tree
+                function traverse(node) {
+                    graph[node.scientific.toLowerCase()] = [];
+                    if (node.name && node.scientific) {
+                        nameMap[node.scientific.toLowerCase()] = node.name;
+                    }
+                    if (node.children) {
+                        for (const child of node.children) {
+                            graph[node.scientific.toLowerCase()].push(child.scientific.toLowerCase());
+                            traverse(child);
+                        }
+                    }
                 }
-                const treeJson = await treeRes.json();
-                graph = jsonTreeToGraph(treeJson, nameMap);
-                graph = lowerCaseGraph(graph);
-                nameMap = lowerCaseNameMap(nameMap);
+                traverse(json);
             } catch (err) {
                 showError(`Failed to load data: ${err.message}`);
             }
@@ -842,19 +778,20 @@
             errorDiv.classList.remove('show');
         }
 
-        function chooseRandomGuess(guesses) {
-            if (guesses.length === 0) return null;
-            const idx = Math.floor(Math.random() * guesses.length);
-            return guesses[idx];
+        function getEntropyWeight() {
+            return parseInt(document.getElementById('entropy-weight-slider').value) / 100;
         }
 
+        // Form submission
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             hideError();
 
-            const clade = document.getElementById('clade').value.trim();
+            const clade = document.getElementById('clade').value.trim().toLowerCase();
             const exclusionsText = document.getElementById('exclusions').value.trim();
-            const exclusions = exclusionsText ? exclusionsText.split('\n').map(s => s.trim()).filter(s => s) : [];
+            const exclusions = exclusionsText
+                ? exclusionsText.split('\n').map(s => s.trim().toLowerCase()).filter(s => s)
+                : [];
 
             if (!clade) {
                 showError('Please enter a clade');
@@ -866,26 +803,47 @@
 
             setTimeout(() => {
                 try {
-                    const scientificMap = Object.fromEntries(Object.entries(nameMap).map(([k, v]) => [v.toLowerCase(), k]));
-                    const exclusionScientific = exclusions.map(s => scientificMap[s.toLowerCase()] || s);
+                    // Find clade in graph
+                    let actualClade = null;
+                    for (const key of Object.keys(graph)) {
+                        if (key === clade) {
+                            actualClade = key;
+                            break;
+                        }
+                    }
+                    if (!actualClade) {
+                        showError(`Clade "${clade}" not found`);
+                        loadingDiv.classList.remove('show');
+                        return;
+                    }
 
-                    const tree = pruneGraph(graph, clade, exclusionScientific);
+                    // Prune tree
+                    const prunedTree = {};
+                    function isAncestor(node) {
+                        if (node === actualClade) return true;
+                        const parent = findParent(graph, node);
+                        return parent ? isAncestor(parent) : false;
+                    }
+                    for (const [k, v] of Object.entries(graph)) {
+                        if (isAncestor(k)) prunedTree[k] = v;
+                    }
 
                     let guesses;
-                    if (STRATEGY_TYPE === 'minimax') {
-                        guesses = bestLeafGuessMinimax(tree);
-                    } else if (STRATEGY_TYPE === 'entropy') {
-                        guesses = bestLeafGuessEntropy(tree);
-                    } else if (STRATEGY_TYPE === 'hybrid') {
-                        guesses = bestLeafGuessHybrid(tree);
+                    if (currentStrategy === 'minimax') {
+                        guesses = bestLeafGuessMinimax(prunedTree);
+                    } else if (currentStrategy === 'entropy') {
+                        guesses = bestLeafGuessEntropy(prunedTree);
+                    } else if (currentStrategy === 'hybrid') {
+                        const weight = getEntropyWeight();
+                        guesses = bestLeafGuessHybrid(prunedTree, weight);
                     } else {
-                        guesses = bestLeafGuessMinimax(tree);
+                        guesses = bestLeafGuessMinimax(prunedTree);
                     }
 
                     if (guesses.length === 0) {
                         showError(`No valid candidates found in clade "${clade}"`);
                     } else {
-                        const primaryGuess = chooseRandomGuess(guesses);
+                        const primaryGuess = guesses[Math.floor(Math.random() * guesses.length)];
                         const commonName = nameMap[primaryGuess] || primaryGuess;
 
                         resultName.textContent = commonName;
@@ -895,12 +853,7 @@
                             const otherGuesses = guesses.filter(g => g !== primaryGuess);
                             alternativesList.innerHTML = otherGuesses.map(guess => {
                                 const commonAlt = nameMap[guess] || guess;
-                                return `
-                                    <div class="alternative-item">
-                                        <span class="name">${commonAlt}</span><br>
-                                        <span class="scientific">${guess}</span>
-                                    </div>
-                                `;
+                                return `<div class="alternative-item"><span class="name">${commonAlt}</span><br><span class="scientific">${guess}</span></div>`;
                             }).join('');
                             alternativesDiv.style.display = 'block';
                         } else {
@@ -916,12 +869,38 @@
             }, 100);
         });
 
-        // Initialize
-        initializeGameUI();
-        updateStrategyDescription();
-        loadData();
+        // Slider updates
+        document.getElementById('entropy-weight-slider').addEventListener('input', (e) => {
+            const value = parseInt(e.target.value) / 100;
+            document.getElementById('slider-value').textContent = value.toFixed(2);
+        });
 
-        // Game switcher buttons
+        // Strategy buttons
+        document.getElementById('btn-minimax').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('strategy', 'minimax');
+            window.history.pushState({}, '', `?${params.toString()}`);
+            updateStrategyUI('minimax');
+        });
+
+        document.getElementById('btn-entropy').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('strategy', 'entropy');
+            window.history.pushState({}, '', `?${params.toString()}`);
+            updateStrategyUI('entropy');
+        });
+
+        document.getElementById('btn-hybrid').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('strategy', 'hybrid');
+            window.history.pushState({}, '', `?${params.toString()}`);
+            updateStrategyUI('hybrid');
+        });
+
+        // Game buttons
         document.getElementById('btn-metazooa').addEventListener('click', (e) => {
             e.preventDefault();
             const params = new URLSearchParams(window.location.search);
@@ -936,37 +915,10 @@
             window.location.href = `?${params.toString()}`;
         });
 
-        // Strategy switcher buttons
-        document.getElementById('btn-minimax').addEventListener('click', (e) => {
-            e.preventDefault();
-            const params = new URLSearchParams(window.location.search);
-            params.set('strategy', 'minimax');
-            window.location.href = `?${params.toString()}`;
-        });
-
-        document.getElementById('btn-entropy').addEventListener('click', (e) => {
-            e.preventDefault();
-            const params = new URLSearchParams(window.location.search);
-            params.set('strategy', 'entropy');
-            window.location.href = `?${params.toString()}`;
-        });
-
-        document.getElementById('btn-hybrid').addEventListener('click', (e) => {
-            e.preventDefault();
-            const params = new URLSearchParams(window.location.search);
-            params.set('strategy', 'hybrid');
-            window.location.href = `?${params.toString()}`;
-        });
-
-        // Update active buttons
-        function updateActiveButtons() {
-            document.getElementById('btn-metazooa').classList.toggle('active', GAME_TYPE === 'metazooa');
-            document.getElementById('btn-metaflora').classList.toggle('active', GAME_TYPE === 'metaflora');
-            document.getElementById('btn-minimax').classList.toggle('active', STRATEGY_TYPE === 'minimax');
-            document.getElementById('btn-entropy').classList.toggle('active', STRATEGY_TYPE === 'entropy');
-            document.getElementById('btn-hybrid').classList.toggle('active', STRATEGY_TYPE === 'hybrid');
-        }
-        updateActiveButtons();
+        // Initialize
+        updateGameUI(currentGame);
+        updateStrategyUI(currentStrategy);
+        loadData();
     </script>
 </body>
 </html>
