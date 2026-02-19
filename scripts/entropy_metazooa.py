@@ -4,6 +4,7 @@
 import argparse
 import math
 import time
+from collections import defaultdict
 from typing import Dict, List
 
 from guess_metazooa import prepare_tree
@@ -61,42 +62,28 @@ def compute_entropy(candidates: List[str]) -> float:
 
 
 def compute_information_gain(
-    initial_guess: str,
-    clade: str,
-    graph: Dict[str, List[str]],
+    guess: str,
+    initial_clade: str,
+    tree: Dict[str, List[str]],
 ) -> tuple[float, float]:
-    """
-    Compute the information gain from making an initial guess.
-
-    Args:
-        initial_guess: The species to guess
-        clade: The clade (all possible targets)
-        graph: The taxonomy graph
-
-    Returns:
-        (information_gain, expected_entropy_after_guess)
-    """
-    candidates = get_clade_species(graph, clade)
+    candidates = get_clade_species(tree, initial_clade)
     initial_entropy = compute_entropy(candidates)
 
     if initial_entropy == 0:
         return 0.0, 0.0
 
-    # For each candidate target, compute what LCA feedback we'd get
-    feedback_groups: Dict[str, int] = {}
+    buckets: Dict[str, int] = defaultdict(int)
 
     for target in candidates:
-        feedback_clade = lca(graph, initial_guess, target)
-        feedback_groups[feedback_clade] = feedback_groups.get(feedback_clade, 0) + 1
+        clade = lca(tree, guess, target)
+        buckets[clade] += 1
 
-    # Compute expected entropy after receiving feedback
     expected_entropy_after = 0.0
     total_candidates = len(candidates)
 
-    for group_clade, group_size in feedback_groups.items():
+    for group_clade, group_size in buckets.items():
         probability = group_size / total_candidates
-        # Get remaining candidates in this group
-        group_candidates = get_clade_species(graph, group_clade)
+        group_candidates = get_clade_species(tree, group_clade)
         group_entropy = compute_entropy(group_candidates)
         expected_entropy_after += probability * group_entropy
 
@@ -232,6 +219,7 @@ if __name__ == "__main__":
                 results.append((guess, info_gain, exp_entropy_after, exp_guesses))
 
                 progress.update(task_id, advance=1)
+                print(f"Tested: {format_guess(guess, name_map)} | Info Gain: {info_gain:.4f} bits | Expected Guesses: {exp_guesses:.4f}")
 
         results.sort(key=lambda x: x[3])
 

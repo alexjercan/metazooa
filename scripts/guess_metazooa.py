@@ -26,13 +26,6 @@ def compute_entropy(candidates: List[str]) -> float:
 
 
 def best_leaf_guess_minmax(tree: Dict[str, List[str]]) -> List[str]:
-    """
-    Find the best leaf guess that minimizes the worst-case number of remaining candidates.
-
-    Uses a minmax strategy: for each candidate guess, simulate what happens if you
-    get feedback about the LCA (lowest common ancestor) between your guess and the
-    actual answer. Pick the guess where the largest group of possibilities is smallest.
-    """
     candidates = get_all_leaves(tree)
 
     best_worst_case = float("inf")
@@ -41,9 +34,8 @@ def best_leaf_guess_minmax(tree: Dict[str, List[str]]) -> List[str]:
     for guess in candidates:
         buckets: Dict[str, int] = defaultdict(int)
 
-        # Count how many candidates would fall into each bucket based on their LCA
-        for leaf in candidates:
-            clade = lca(tree, guess, leaf)
+        for target in candidates:
+            clade = lca(tree, guess, target)
             buckets[clade] += 1
 
             if buckets[clade] >= best_worst_case:

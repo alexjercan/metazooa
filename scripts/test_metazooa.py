@@ -9,7 +9,7 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from copy import deepcopy
 from typing import Dict, List
 
-from guess_metazooa import best_leaf_guess, prepare_tree
+from guess_metazooa import guess_metazooa, prepare_tree
 from helpers import (
     ensure_tree_file,
     get_all_leaves,
@@ -56,14 +56,15 @@ def is_node_in_clade(graph: Dict[str, List[str]], node: str, clade: str) -> bool
 
 
 def run_single_game(args):
-    initial_guess, target, graph = args
-    return count_guesses_to_target(initial_guess, target, graph)
+    initial_guess, target, graph, strategy = args
+    return count_guesses_to_target(initial_guess, target, graph, strategy)
 
 
 def count_guesses_to_target(
     initial_guess: str,
     target: str,
     graph: Dict[str, List[str]],
+    strategy: str = "minmax",
 ) -> int:
     """
     Count how many guesses it takes to find the target species starting from initial_guess.
@@ -73,6 +74,7 @@ def count_guesses_to_target(
         initial_guess: The first species to guess
         target: The target species to find
         graph: The taxonomy graph
+        strategy: The guessing strategy to use ("minmax" or "entropy")
 
     Returns:
         Number of guesses it took to find the target
@@ -101,7 +103,7 @@ def count_guesses_to_target(
         parent_map = build_parent_map(remaining_graph)
 
         # Find the next best guess
-        guesses = best_leaf_guess(remaining_graph)
+        _, guesses = guess_metazooa(remaining_graph, hint, [], strategy=strategy)
         if not guesses:
             # Target is unreachable - algorithm failed
             raise AssertionError(f"CRITICAL: Target '{target}' became unreachable! Initial guess was '{initial_guess}'. Algorithm failed to find the target.")
@@ -118,6 +120,7 @@ def batch_test_clade(
     clade: str,
     graph: Dict[str, List[str]],
     name_map: Dict[str, str],
+    strategy: str = "minmax",
     num_tests: int = 1000,
     progress: Progress = None,
 ) -> tuple[int, float]:
@@ -129,6 +132,7 @@ def batch_test_clade(
         clade: The clade to test within
         graph: The taxonomy graph (already pruned to clade)
         name_map: The species name mapping
+        strategy: The guessing strategy to use ("minmax" or "entropy")
         num_tests: Number of games to play (default: 1000)
 
     Returns:
@@ -140,7 +144,7 @@ def batch_test_clade(
         raise ValueError(f"No species found in clade '{clade}'")
 
     tasks = [
-        (initial_guess, random.choice(clade_species), graph)
+        (initial_guess, random.choice(clade_species), graph, strategy)
         for _ in range(num_tests)
     ]
 
@@ -211,6 +215,12 @@ if __name__ == "__main__":
         help="Game to test (metazooa or metaflora, default: metazooa)",
     )
     parser.add_argument(
+        "--strategy",
+        default="minmax",
+        choices=["minmax", "entropy"],
+        help="Strategy to use: minmax (worst-case), entropy (average-case) (default: minmax)",
+    )
+    parser.add_argument(
         "--batch",
         type=int,
         default=1000,
@@ -274,7 +284,7 @@ if __name__ == "__main__":
         print("=" * 60)
 
         try:
-            total_guesses, average_guesses = batch_test_clade(initial_guess, clade, graph, name_map, args.batch)
+            total_guesses, average_guesses = batch_test_clade(initial_guess, clade, graph, name_map, args.strategy, args.batch)
 
             print(f"✓ All {args.batch} games completed successfully!")
             print(f"Total guesses: {total_guesses}")
@@ -305,7 +315,7 @@ if __name__ == "__main__":
 
             for initial_guess in initial_guesses:
                 try:
-                    total_guesses, average_guesses = batch_test_clade(initial_guess, clade, graph, name_map, args.batch, progress)
+                    total_guesses, average_guesses = batch_test_clade(initial_guess, clade, graph, name_map, args.strategy, args.batch, progress)
                     results.append((initial_guess, total_guesses, average_guesses))
                     print(f"✓ {format_guess(initial_guess, name_map):<40} {average_guesses:>6.2f} avg")
                 except (RuntimeError, ValueError) as e:
