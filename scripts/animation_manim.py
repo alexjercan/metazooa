@@ -169,6 +169,65 @@ class Chapter1_01_HookQuestion(Scene):
         self.play(FadeOut(prev))
 
 
+class Chapter1_01a_GameIntro(Scene):
+    def construct(self):
+        lines = [
+            "There is this game called Metazooa.",
+            "That is exactly the problem it gives you.",
+        ]
+
+        prev = None
+        for line in lines:
+            t = Text(line, font_size=44, color=TEXT_COL)
+            t.move_to(ORIGIN)
+            if prev is None:
+                self.play(FadeIn(t, shift=UP * 0.12), run_time=0.7)
+            else:
+                self.play(FadeOut(prev, shift=UP * 0.10), run_time=0.35)
+                self.play(FadeIn(t,    shift=UP * 0.12), run_time=0.55)
+            self.wait(1.6)
+            prev = t
+
+        self.play(FadeOut(prev), run_time=0.4)
+        self.wait(0.2)
+
+
+class Chapter1_01b_GameRules(Scene):
+    def construct(self):
+        script = [
+            "The rules are simple.",
+            "The game secretly picks an animal.",
+            "You have to try to guess it.",
+            "Every time you make a guess, it gives you a hint.",
+            "Not yes or no. Not warmer or colder.",
+            "It gives you the most specific evolutionary group",
+            "that your guess shares with the correct answer.",
+            "That's it. That's the entire game.",
+            "And somehow, that is enough.",
+            "Because every guess reshapes",
+            "the entire space of possibilities.",
+            "And that leads to a very natural question.",
+        ]
+
+        prev = None
+        for line in script:
+            size = 40 if len(line) < 42 else 34
+            t = Text(line, font_size=size, color=TEXT_COL, line_spacing=1.2)
+            t.move_to(ORIGIN)
+
+            if prev is None:
+                self.play(FadeIn(t, shift=UP * 0.12), run_time=0.65)
+            else:
+                self.play(FadeOut(prev, shift=UP * 0.10), run_time=0.30)
+                self.play(FadeIn(t,    shift=UP * 0.12), run_time=0.60)
+
+            hold = 1.2 if "question" not in line else 1.8
+            self.wait(hold)
+            prev = t
+
+        self.play(FadeOut(prev), run_time=0.45)
+
+
 class Chapter1_02_BestFirstGuess(Scene):
     def construct(self):
         q = Text("Best first guess?", font_size=72, color=TEXT_COL, weight=BOLD)
@@ -299,8 +358,8 @@ class Chapter2_04_EliminateOutside(Scene):
         for k in outside_edges:
             dim.append(E[k].animate.set_stroke(MUTED, opacity=0.10))
 
-        self.play(*dim, run_time=1.1, lag_ratio=0.04)
-        self.wait(0.6)
+        self.play(*dim, run_time=2.0, lag_ratio=0.04)
+        self.wait(3.0)
 
         survivors = ["Wolf", "Cat", "Rabbit"]
         self.play(
@@ -492,7 +551,7 @@ class Chapter3_01_EqualProbabilities(Scene):
             )
             self.play(*anims, run_time=0.55, lag_ratio=0.1)
 
-        self.wait(0.5)
+        self.wait(2.5)
 
         fracs = VGroup(*[
             MathTex(r"\tfrac{1}{7}", font_size=19, color=MUTED)
@@ -500,7 +559,7 @@ class Chapter3_01_EqualProbabilities(Scene):
             for name in LEAVES
         ])
         self.play(FadeIn(fracs, lag_ratio=0.12), run_time=1.0)
-        self.wait(0.4)
+        self.wait(2.5)
 
         self.play(
             *[N[name][0].animate.set_fill(ACCENT, opacity=0.6)
@@ -526,7 +585,7 @@ class Chapter3_02_SplitAndBars(Scene):
                                .set_stroke(GREEN_COL, width=2) for n in small_leaves],
             run_time=0.8,
         )
-        self.wait(0.5)
+        self.wait(2.0)
 
         ell_big = SurroundingRectangle(
             VGroup(*[N[n][0] for n in big_leaves]),
@@ -537,7 +596,7 @@ class Chapter3_02_SplitAndBars(Scene):
             color=GREEN_COL, corner_radius=0.35, stroke_width=2.5, buff=0.32,
         )
         self.play(Create(ell_big), Create(ell_small), run_time=0.7)
-        self.wait(1.8)
+        self.wait(10.0)
 
         balanced_blue  = ["Wolf", "Cat", "Rabbit"]
         balanced_green = ["Eagle", "Lizard", "Bee", "Crab"]
@@ -591,9 +650,10 @@ class Chapter3_03_SurpriseGraph(Scene):
                         color=ACCENT, stroke_width=3)
 
         self.play(Create(ax), FadeIn(x_label), FadeIn(y_label), run_time=1.0)
+        self.wait(15.0)
         self.play(Create(curve), run_time=1.2)
         self.play(Write(formula), run_time=0.8)
-        self.wait(0.5)
+        self.wait(10.0)
 
         highlights = [
             (0.5,   1, "1 \\ \\text{bit}"),
@@ -613,9 +673,108 @@ class Chapter3_03_SurpriseGraph(Scene):
 
             self.play(Create(v_line), Create(h_line), run_time=0.4)
             self.play(FadeIn(dot, scale=0.5), FadeIn(bit_label), run_time=0.4)
-            self.wait(0.9)
+            self.wait(5.0)
 
         self.wait(2)
+
+
+class Chapter3_03b_EntropyFormula(Scene):
+    def construct(self):
+        # Example split with three possible outcomes
+        p_vals   = [0.50, 0.30, 0.20]
+        colors   = [ACCENT, GREEN_COL, AMBER_COL]
+        outcomes = [r"p_1", r"p_2", r"p_3"]
+
+        root_pos = np.array([0.0, 2.4, 0])
+        leaf_y   = -0.6
+        xs       = [-3.2, 0.0, 3.2]
+
+        root = Dot(root_pos, color=MUTED, radius=0.11)
+        leaves = []
+        lines  = []
+        for x, col in zip(xs, colors):
+            pos = np.array([x, leaf_y, 0])
+            leaves.append(Circle(radius=0.16, fill_color=col, fill_opacity=1,
+                                 stroke_width=0).move_to(pos))
+            lines.append(Line(root_pos, pos, color=EDGE_COL, stroke_width=2))
+
+        self.play(FadeIn(root), *[Create(l) for l in lines],
+                  *[FadeIn(n, scale=0.7) for n in leaves], run_time=0.8)
+        self.wait(0.3)
+
+        # Probability labels along each branch
+        p_labels = []
+        for line, p, col in zip(lines, p_vals, colors):
+            mid = line.point_from_proportion(0.55)
+            lbl = MathTex(rf"p = {p:.2f}", font_size=24, color=col)
+            lbl.next_to(mid, DOWN, buff=0.10)
+            p_labels.append(lbl)
+
+        self.play(FadeIn(VGroup(*p_labels), lag_ratio=0.08), run_time=0.6)
+        self.wait(2.0)
+
+        # Information values over each outcome
+        I_vals   = [-math.log2(p) for p in p_vals]
+        I_labels = []
+        for leaf, p, I, col in zip(leaves, p_vals, I_vals, colors):
+            lbl = MathTex(rf"I = -\log_2 {p:.2f} \approx {I:.2f}",
+                          font_size=22, color=TEXT_COL)
+            lbl.next_to(leaf, UP, buff=0.18)
+            I_labels.append(lbl)
+
+        self.play(FadeIn(VGroup(*I_labels), lag_ratio=0.1), run_time=0.7)
+        self.wait(10.0)
+
+        expect_lbl = MathTex(r"H = \mathbb{E}[I]", font_size=34, color=TEXT_COL)
+        expect_lbl.to_corner(UR, buff=0.5)
+        self.play(Write(expect_lbl), run_time=0.6)
+        self.wait(10.0)
+
+        # Weighted contributions p × I for each branch
+        products = []
+        for leaf, p_lbl, I_lbl, p, I, col in zip(
+                leaves, p_labels, I_labels, p_vals, I_vals, colors):
+            prod = p * I
+            term = MathTex(rf"p \times I \approx {prod:.2f}",
+                           font_size=22, color=col)
+            term.next_to(leaf, DOWN, buff=0.28)
+            products.append(term)
+
+            self.play(
+                p_lbl.animate.set_color(col),
+                I_lbl.animate.set_color(col),
+                FadeIn(term, shift=DOWN * 0.1),
+                run_time=0.65,
+            )
+            self.wait(0.25)
+
+        H_est = sum(p * I for p, I in zip(p_vals, I_vals))
+        H_lbl = MathTex(rf"H \approx {H_est:.2f}\ \text{{bits}}",
+                        font_size=30, color=TEXT_COL)
+        H_lbl.next_to(VGroup(*products), DOWN, buff=0.5)
+        self.play(Write(H_lbl), run_time=0.6)
+        self.wait(1.5)
+
+        # Build the symbolic formula step by step
+        term1 = MathTex(r"H = p_1 I_1", font_size=36, color=TEXT_COL)
+        term1.to_edge(DOWN, buff=0.8)
+        term2 = MathTex(r"H = p_1 I_1 + p_2 I_2", font_size=36, color=TEXT_COL)
+        term2.move_to(term1)
+        term3 = MathTex(r"H = p_1 I_1 + p_2 I_2 + p_3 I_3",
+                        font_size=36, color=TEXT_COL)
+        term3.move_to(term1)
+        final = MathTex(r"H = -\sum_i p_i \log_2 p_i",
+                        font_size=44, color=TEXT_COL)
+        final.move_to(term1)
+
+        self.play(Write(term1), run_time=0.6)
+        self.wait(0.4)
+        self.play(ReplacementTransform(term1, term2), run_time=0.6)
+        self.wait(0.3)
+        self.play(ReplacementTransform(term2, term3), run_time=0.6)
+        self.wait(0.3)
+        self.play(ReplacementTransform(term3, final), run_time=0.7)
+        self.wait(2.0)
 
 
 class Chapter3_04_EntropyExpectedValue(Scene):
@@ -739,6 +898,52 @@ class Chapter3_04_EntropyExpectedValue(Scene):
         self.wait(2.0)
 
 
+class Chapter3_04b_EntropyExpectedValue(Scene):
+    def construct(self):
+        # Start with the toy tree, slightly zoomed out
+        N, E = build_tree()
+        tree = VGroup(*E.values(), *N.values()).scale(0.8).move_to(UP * 0.6)
+        self.play(FadeIn(tree, lag_ratio=0.05), run_time=0.8)
+        self.wait(0.4)
+
+        # Two partitions: unbalanced (5:2) vs balanced (3:4)
+        split_unbal = Text("5 : 2", font_size=26, color=MUTED)
+        split_bal   = Text("3 : 4", font_size=26, color=TEXT_COL)
+        split_unbal.to_edge(LEFT, buff=0.9).shift(DOWN * 0.4)
+        split_bal.to_edge(RIGHT, buff=0.9).shift(DOWN * 0.4)
+
+        H_unbal = -(5/7)*math.log2(5/7) - (2/7)*math.log2(2/7)
+        H_bal   = -(3/7)*math.log2(3/7) - (4/7)*math.log2(4/7)
+        lbl_unbal = MathTex(rf"H = {H_unbal:.2f}\ \text{{bits}}",
+                            font_size=30, color=MUTED)
+        lbl_bal   = MathTex(rf"H = {H_bal:.2f}\ \text{{bits}}",
+                            font_size=30, color=GREEN_COL)
+        lbl_unbal.next_to(split_unbal, DOWN, buff=0.2)
+        lbl_bal.next_to(split_bal, DOWN, buff=0.2)
+
+        self.play(FadeIn(split_unbal, shift=UP * 0.1), run_time=0.4)
+        self.play(Write(lbl_unbal), run_time=0.6)
+        self.wait(0.4)
+        self.play(FadeIn(split_bal, shift=UP * 0.1), run_time=0.4)
+        self.play(Write(lbl_bal), run_time=0.6)
+        self.wait(0.6)
+
+        # Highlight takeaway: balanced partitions maximize entropy
+        takeaway = Text("Balanced partitions maximize entropy",
+                        font_size=32, color=TEXT_COL, weight=BOLD)
+        takeaway.to_edge(DOWN, buff=0.5)
+        self.play(Write(takeaway), run_time=0.7)
+        self.play(lbl_bal.animate.scale(1.14), run_time=0.3)
+        self.play(lbl_bal.animate.scale(1/1.14), run_time=0.25)
+        self.wait(0.5)
+
+        # Final overlay: Maximize Entropy
+        banner = Text("Maximize Entropy", font_size=40, color=AMBER_COL, weight=BOLD)
+        banner.to_corner(UR, buff=0.6)
+        self.play(FadeIn(banner, scale=0.9), run_time=0.5)
+        self.wait(2.0)
+
+
 class Chapter3_05_EntropyComparison(Scene):
     def construct(self):
         H_unbal = -(5/7)*math.log2(5/7) - (2/7)*math.log2(2/7)
@@ -820,7 +1025,7 @@ class Chapter4_01_ScaleReveal(Scene):
         self.play(
             cloud.animate.set_fill(color=ACCENT, opacity=0.55)
                           .set_stroke(color=ACCENT, width=0.5, opacity=0.6),
-            run_time=1.0, lag_ratio=0.004,
+            run_time=3.0, lag_ratio=0.004,
         )
 
         counter_val = {"v": 0}
@@ -871,6 +1076,7 @@ class Chapter4_02_BucketFormation(Scene):
         tree = VGroup(*E.values(), *N.values())
         tree.scale(0.62).to_edge(UP, buff=0.3)
         self.play(FadeIn(tree, lag_ratio=0.05), run_time=1.0)
+        self.wait(20.0)
 
         self.play(
             N["Wolf"][0].animate.set_fill(ACCENT).set_stroke(ACCENT, width=3),
@@ -1379,6 +1585,99 @@ class Chapter5_02_EntropyVsMinmax(Scene):
         self.wait(2.5)
 
 
+class Chapter5_02b_OptimizationDifference(Scene):
+    def construct(self):
+        title = Text("worst-case vs average-case", font_size=28,
+                     color=TEXT_COL, weight=BOLD)
+        title.to_edge(UP, buff=0.5)
+
+        subtitle = Text("entropy vs minmax optimize different goals",
+                        font_size=20, color=MUTED)
+        subtitle.next_to(title, DOWN, buff=0.12)
+
+        self.play(FadeIn(title, shift=DOWN * 0.1), run_time=0.5)
+        self.play(FadeIn(subtitle), run_time=0.4)
+        self.wait(0.4)
+
+        div = DashedLine(UP * 3.2, DOWN * 3.2, color=EDGE_COL, stroke_width=1.2)
+        self.play(Create(div), run_time=0.3)
+
+        # Left: Entropy (average-case)
+        ent_header = Text("Entropy (average-case)", font_size=22, color=ACCENT, weight=BOLD)
+        ent_header.move_to(np.array([-3.2, 2.5, 0]))
+        ent_bullets = VGroup(
+            Text("weights by probabilities", font_size=18, color=TEXT_COL),
+            Text("measures expected information", font_size=18, color=TEXT_COL),
+            Text("goal: minimize average steps", font_size=18, color=TEXT_COL),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.18)
+        ent_bullets.move_to(np.array([-3.2, 1.2, 0]))
+
+        self.play(FadeIn(ent_header, shift=DOWN * 0.1), run_time=0.5)
+        self.play(LaggedStart(*[FadeIn(b, shift=RIGHT * 0.1) for b in ent_bullets],
+                              lag_ratio=0.08), run_time=0.7)
+
+        # Right: Minmax (worst-case)
+        mm_header = Text("Minmax (worst-case)", font_size=22, color=AMBER_COL, weight=BOLD)
+        mm_header.move_to(np.array([3.2, 2.5, 0]))
+        mm_bullets = VGroup(
+            Text("ignores probabilities", font_size=18, color=TEXT_COL),
+            Text("looks only at biggest bucket", font_size=18, color=TEXT_COL),
+            Text("goal: cap the worst case", font_size=18, color=TEXT_COL),
+        ).arrange(DOWN, aligned_edge=LEFT, buff=0.18)
+        mm_bullets.move_to(np.array([3.2, 1.2, 0]))
+
+        self.play(FadeIn(mm_header, shift=DOWN * 0.1), run_time=0.5)
+        self.play(LaggedStart(*[FadeIn(b, shift=LEFT * 0.1) for b in mm_bullets],
+                              lag_ratio=0.08), run_time=0.7)
+        self.wait(15.0)
+
+        # Visual contrast: two mini trees with braces/labels
+        def mini_tree(x_center, left_n, right_n, color_left, color_right):
+            top = np.array([x_center, -0.1, 0])
+            bl  = np.array([x_center - 1.2, -1.5, 0])
+            br  = np.array([x_center + 1.2, -1.5, 0])
+            root = Dot(top, color=MUTED, radius=0.10)
+            line_l = Line(top, bl, color=EDGE_COL, stroke_width=1.8)
+            line_r = Line(top, br, color=EDGE_COL, stroke_width=1.8)
+
+            def cluster(n, color, center):
+                spacing = 0.24
+                return VGroup(*[
+                    Circle(radius=0.09, fill_color=color, fill_opacity=1, stroke_width=0)
+                    .move_to(center + LEFT * spacing * (n - 1) / 2 + RIGHT * spacing * i)
+                    for i in range(n)
+                ])
+
+            cl = cluster(left_n,  color_left,  bl)
+            cr = cluster(right_n, color_right, br)
+            brace_side = Brace(cl if left_n >= right_n else cr, direction=DOWN,
+                               color=AMBER_COL)
+            brace_lbl = Text("worst bucket", font_size=16, color=AMBER_COL)
+            brace_lbl.next_to(brace_side, DOWN, buff=0.08)
+
+            return VGroup(root, line_l, line_r, cl, cr, brace_side, brace_lbl)
+
+        tree_entropy = mini_tree(-3.2, 3, 4, ACCENT, GREEN_COL)
+        tree_minmax  = mini_tree( 3.2, 5, 2, ACCENT, GREEN_COL)
+
+        self.play(FadeIn(tree_entropy, lag_ratio=0.05),
+                  FadeIn(tree_minmax,  lag_ratio=0.05), run_time=0.8)
+        self.wait(0.6)
+
+        # Punchline: need to test which wins faster
+        punch = Text("We have to test to see which actually wins faster",
+                     font_size=22, color=TEXT_COL)
+        punch.to_edge(DOWN, buff=0.45)
+        self.play(Write(punch), run_time=0.7)
+        self.wait(0.4)
+
+        # Transition cue to batch testing
+        cue = Text("→ run simulations", font_size=20, color=AMBER_COL, weight=BOLD)
+        cue.next_to(punch, DOWN, buff=0.14)
+        self.play(FadeIn(cue, shift=UP * 0.1), run_time=0.4)
+        self.wait(2.0)
+
+
 class Chapter5_03_Convergence(Scene):
     def construct(self):
         entropy_top = ["Mink", "Ferret", "Weasel", "Sea Otter", "River Otter"]
@@ -1544,68 +1843,63 @@ class Chapter7_01_MinkAnswer(Scene):
 
 
 class Chapter7_02_BiggerIdea(Scene):
-    """
-    Three beats:
-    1. Cross-fading real-world examples
-    2. What the question forced us to build
-    3. Final two-line payoff with longer hold
-    """
     def construct(self):
-        examples = [
-            ("Debugging code.",          MUTED),
-            ("Medical diagnosis.",        MUTED),
-            ("Playing Twenty Questions.", MUTED),
-            ("Metazooa.",                 ACCENT),
+        beats = [
+            "What we built to get here.",
+            "Measure uncertainty precisely.",
+            "Think about the tree geometrically.",
         ]
 
-        connector = Text("Always the same problem:",
-                         font_size=28, color=MUTED).move_to(UP * 1.2)
-        subline   = Text("ask questions that split possibilities evenly",
-                         font_size=28, color=TEXT_COL).move_to(ORIGIN)
-
-        self.play(FadeIn(connector, shift=UP * 0.15), run_time=0.7)
-
         prev = None
-        for phrase, color in examples:
-            t = Text(phrase, font_size=42, color=color, weight=BOLD)
-            t.move_to(DOWN * 1.0)
+        for i, line in enumerate(beats):
+            t = Text(line, font_size=38 if i == 0 else 34,
+                     color=TEXT_COL if i == 0 else MUTED,
+                     weight=BOLD if i == 0 else NORMAL)
+            t.move_to(ORIGIN)
             if prev is None:
-                self.play(FadeIn(t, shift=UP * 0.12), run_time=0.6)
+                self.play(FadeIn(t, shift=UP * 0.12), run_time=0.7)
             else:
-                self.play(FadeOut(prev, shift=UP * 0.1), run_time=0.3)
-                self.play(FadeIn(t,    shift=UP * 0.12), run_time=0.5)
-            self.wait(1.4)
+                self.play(FadeOut(prev, shift=UP * 0.10), run_time=0.35)
+                self.play(FadeIn(t,    shift=UP * 0.12), run_time=0.55)
+            hold = 2.2 if i == 0 else 1.6
+            self.wait(hold)
             prev = t
 
         self.play(FadeOut(prev), run_time=0.4)
-        self.play(FadeIn(subline, shift=UP * 0.15), run_time=0.7)
-        self.wait(1.2)
-        self.play(FadeOut(VGroup(connector, subline)), run_time=0.5)
+        self.wait(8.0)
 
-        # ── Beat 2: what answering this question required ──────────────────
-        build_lines = VGroup(
-            Text("To answer one game question,",          font_size=30, color=MUTED),
-            Text("we had to formalize uncertainty,",      font_size=30, color=TEXT_COL),
-            Text("think geometrically about a tree,",    font_size=30, color=TEXT_COL),
-            Text("and ask what's most useful to know next.", font_size=30, color=ACCENT),
-        ).arrange(DOWN, buff=0.38).move_to(ORIGIN)
+        examples = [
+            "Good doctor ruling out diagnoses.",
+            "Binary search on a sorted list.",
+            "Designing an experiment.",
+        ]
+        for line in examples:
+            t = Text(line, font_size=32, color=TEXT_COL)
+            t.move_to(ORIGIN)
+            self.play(FadeIn(t, shift=UP * 0.10), run_time=0.5)
+            self.wait(1.4)
+            self.play(FadeOut(t, shift=UP * 0.08), run_time=0.35)
 
-        for line in build_lines:
-            self.play(FadeIn(line, shift=UP * 0.12), run_time=0.6)
-            self.wait(0.9)
+        self.wait(2.2)
 
-        self.wait(0.8)
-        self.play(FadeOut(build_lines), run_time=0.6)
 
-        # ── Beat 3: final payoff ───────────────────────────────────────────
-        final = VGroup(
-            Text("Measure your uncertainty.", font_size=44,
-                 color=TEXT_COL, weight=BOLD),
-            Text("Cut it in half.",           font_size=44,
-                 color=ACCENT,   weight=BOLD),
-        ).arrange(DOWN, buff=0.38).move_to(ORIGIN)
+class Chapter7_03_OutroThanks(Scene):
+    def construct(self):
+        lines = [
+            "Mink is the best first guess.",
+            "But the real answer is simpler:",
+            "Measure your uncertainty, and cut it in half.",
+        ]
 
-        self.play(FadeIn(final[0], shift=UP * 0.15), run_time=0.7)
-        self.wait(0.5)
-        self.play(FadeIn(final[1], shift=UP * 0.15), run_time=0.7)
-        self.wait(4.0)
+        y = 0.8
+        for i, line in enumerate(lines):
+            t = Text(line, font_size=36, color=TEXT_COL if i != 1 else MUTED,
+                     weight=BOLD if i == 2 else NORMAL)
+            t.move_to(np.array([0.0, y - i * 0.65, 0]))
+            self.play(FadeIn(t, shift=UP * 0.12), run_time=0.6)
+            self.wait(0.8)
+
+        thanks = Text("Thanks for watching.", font_size=34, color=ACCENT, weight=BOLD)
+        thanks.to_edge(DOWN, buff=0.6)
+        self.play(FadeIn(thanks, shift=UP * 0.12), run_time=0.6)
+        self.wait(2.5)
