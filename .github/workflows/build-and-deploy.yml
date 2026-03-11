@@ -43,6 +43,15 @@ jobs:
       - name: Generate phylogenetic tree
         run: python scripts/generate_tree.py --output commontree-metaflora.json
 
+      - name: Generate phylogenetic tree for metajurassic
+        run: |
+          git clone --depth 1 https://github.com/alexjercan/metajurassic.git
+          cd metajurassic
+          python3 scripts/markdown_to_json.py
+          cp commontree-metajurassic.json ../commontree-metajurassic.json
+          cd ..
+          rm -rf metajurassic
+
       - name: Upload to GitHub Pages
         uses: actions/upload-pages-artifact@v3
         with:
