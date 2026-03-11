@@ -562,6 +562,9 @@
             document.getElementById('page-title').textContent = `${info.title} Guesser`;
             document.getElementById('game-title').textContent = info.title;
             document.querySelector('.subtitle').textContent = info.subtitle;
+            document.getElementById('btn-metazooa').classList.toggle('active', game === 'metazooa');
+            document.getElementById('btn-metaflora').classList.toggle('active', game === 'metaflora');
+            document.getElementById('btn-metajurassic').classList.toggle('active', game === 'metajurassic');
         }
 
         // Update strategy description
