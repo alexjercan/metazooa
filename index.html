@@ -442,6 +442,7 @@
             <div class="game-switcher">
                 <button type="button" class="game-btn active" id="btn-metazooa" title="Animals">🦁</button>
                 <button type="button" class="game-btn" id="btn-metaflora" title="Plants">🌿</button>
+                <button type="button" class="game-btn" id="btn-metajurassic" title="Dinosaurs">🦖</button>
             </div>
         </div>
         <p class="subtitle">Find your perfect species</p>
@@ -530,7 +531,16 @@
         }
 
         let currentGame = getGameType();
+        if (!["metazooa", "metaflora", "metajurassic"].includes(currentGame)) {
+            console.warn(`Unknown game "${currentGame}", defaulting to "metazooa"`);
+            currentGame = "metazooa";
+        }
+
         let currentStrategy = getStrategy();
+        if (!["minmax", "entropy", "hybrid"].includes(currentStrategy)) {
+            console.warn(`Unknown strategy "${currentStrategy}", defaulting to "minmax"`);
+            currentStrategy = "minmax";
+        }
 
         // Update page with game-specific content
         function updateGameUI(game) {
@@ -542,7 +552,11 @@
                 metaflora: {
                     title: 'Metaflora',
                     subtitle: 'Find your perfect plant'
-                }
+                },
+                metajurassic: {
+                    title: 'Metajurassic',
+                    subtitle: 'Find your perfect dinosaur'
+                },
             };
             const info = config[game] || config.metazooa;
             document.getElementById('page-title').textContent = `${info.title} Guesser`;
@@ -969,6 +983,13 @@
             e.preventDefault();
             const params = new URLSearchParams(window.location.search);
             params.set('game', 'metaflora');
+            window.location.href = `?${params.toString()}`;
+        });
+
+        document.getElementById('btn-metajurassic').addEventListener('click', (e) => {
+            e.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            params.set('game', 'metajurassic');
             window.location.href = `?${params.toString()}`;
         });
 
