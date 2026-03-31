@@ -58,7 +58,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--game",
         default="metazooa",
-        choices=["metazooa", "metaflora"],
+        choices=["metazooa", "metaflora", "metajurassic"],
         help="Game to play (metazooa or metaflora, default: metazooa)",
     )
 

@@ -263,6 +263,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--game",
         default="metazooa",
+        choices=["metazooa", "metaflora", "metajurassic"],
         help="Game to use for species data (metazooa or metaflora, default: metazooa)",
     )
     parser.add_argument(
